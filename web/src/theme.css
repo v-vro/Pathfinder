@@ -69,9 +69,6 @@
   --dither-fg: var(--pf-white);
   --dither-levels: 2;
 
-  /* Logo: forces the current colour logo to pure white. Set to "none" for a monochrome export. */
-  --logo-filter: brightness(0) invert(1);
-
   /* ---------- Typography ---------- */
   /* The planner's fonts, loaded once for every page by the Google Fonts link in index.html:
      EB Garamond 400/500/600 (+ italics) and IBM Plex Mono 400/500. */
