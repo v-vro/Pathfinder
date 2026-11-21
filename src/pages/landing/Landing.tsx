@@ -18,7 +18,8 @@ import {
   IconSkinMap,
   IconSlice,
 } from "./icons";
-import { aimScene, pathScene, scanScene } from "./scenes/steps";
+import { needleCardScene } from "./scenes/anatomy";
+import { pathScene, scanScene } from "./scenes/steps";
 import "./landing.css";
 
 /** Set to a video URL (e.g. "/demo.mp4" in public/) when the demo is recorded. */
@@ -64,9 +65,7 @@ function Hero() {
           <h1 id="hero-title" className="lp-hero__title">
             Find the safest path to the spot that&nbsp;matters.
           </h1>
-          <p className="lp-hero__sub">
-            Turns a real chest CT into a 3D body and finds the safest biopsy needle route.
-          </p>
+          <p className="lp-hero__sub">Turn a chest CT into 3D and plan the safest biopsy route.</p>
           <div className="lp-hero__actions">
             <Button to="/planner" variant="primary" iconEnd={<IconArrowRight />}>
               Try the planner
@@ -78,7 +77,7 @@ function Hero() {
         </div>
       </div>
 
-      <p className="lp-hero__note pf-mono">Stylised model · illustrative risks</p>
+      <p className="lp-hero__note pf-mono">Stylised model · example risks</p>
       <p
         className={["lp-hero__hint pf-mono", !hintVisible && "is-hidden"].filter(Boolean).join(" ")}
         aria-hidden="true"
@@ -106,8 +105,8 @@ function Problem() {
             <span className="lp-stat__num">1 in 2</span>
           </h2>
           <p className="lp-stat__caption">
-            patients get a collapsed lung (pneumothorax) after a CT-guided lung biopsy. It is the
-            most common complication of the procedure.
+            patients get a collapsed lung (pneumothorax) after a CT-guided lung biopsy, its most
+            common complication.
           </p>
           <div className="lp-people" aria-hidden="true">
             {people.map((p, i) => (
@@ -119,27 +118,20 @@ function Problem() {
               <i className="lp-person lp-person--low" /> 1 in 5
             </span>
             <span>
-              <i className="lp-person lp-person--high" /> up to nearly 1 in 2
+              <i className="lp-person lp-person--high" /> nearly 1 in 2
             </span>
           </p>
           <p className="lp-source pf-muted">
-            Rates vary by study and patient group. Sources: Heerink et al., <cite>Eur Radiol</cite>{" "}
-            2017 (meta-analysis); Boskovic et al., <cite>J Thorac Dis</cite> 2014.
+            Rates vary by study. Sources: Heerink et al., <cite>Eur Radiol</cite> 2017; Boskovic et
+            al., <cite>J Thorac Dis</cite> 2014.
           </p>
         </Reveal>
 
         <Reveal className="lp-problem__why" delay={120}>
           <Panel padding="lg" className="lp-why">
             <h3 className="lp-why__title">Why the route matters</h3>
-            <p>
-              The needle&apos;s path decides how much air-filled lung it crosses, the angle it meets
-              the lung surface, and whether it passes through fissures, emphysema or vessels on the
-              way.
-            </p>
-            <p>
-              Those are some of the strongest predictors of a collapsed lung, and the route is one
-              of the few risk factors a doctor can actually choose.
-            </p>
+            <p>The route sets how much lung the needle crosses and at what angle.</p>
+            <p>Both predict a collapsed lung. Doctors can choose the route.</p>
             <ul className="lp-why__factors" aria-label="Route risk factors">
               {["Lung crossed", "Pleural angle", "Fissures", "Emphysema", "Vessels"].map((f) => (
                 <li key={f}>
@@ -159,21 +151,21 @@ function Problem() {
 const STEPS: { title: string; body: string; scene: DitherSceneSetup; alt: string }[] = [
   {
     title: "Scan to 3D body",
-    body: "A real chest CT is segmented into skin, ribs, lungs, lobes, vessels and the lesion, then rebuilt as a 3D body you can turn and look into.",
+    body: "Pathfinder rebuilds the ribs, lungs, vessels and lesion from a chest CT in 3D.",
     scene: scanScene,
-    alt: "CT slices stacking up into two lungs as a scan plane sweeps upward.",
+    alt: "CT slices stack up into two lungs as a scan plane sweeps upward.",
   },
   {
     title: "Aim and see the risk",
-    body: "Aim the needle with your hand. Each route is scored as you move, and the score tells you why: lung crossed, angle, fissures, emphysema, vessels.",
-    scene: aimScene,
-    alt: "A needle sweeps toward a target and dims when its path would hit a rib.",
+    body: "Point the needle. Pathfinder scores the route as you move and shows what makes it risky: lung crossed, angle, fissures, damaged tissue, vessels.",
+    scene: needleCardScene,
+    alt: "A blue needle tries routes to a target. Each track turns green, yellow or red, with a label.",
   },
   {
     title: "Safest path, explained",
-    body: "One click searches the skin for the lowest-risk route, then Gemini writes a plan for the doctor and a plain-language explanation for the patient.",
+    body: "One click finds the lowest-risk route. Gemini explains it to the doctor and the patient.",
     scene: pathScene,
-    alt: "Candidate routes to a target are tried one by one and the safest lights up.",
+    alt: "Routes to a target light up one at a time until the safest one stays lit.",
   },
 ];
 
@@ -185,7 +177,7 @@ function HowItWorks() {
           <SectionHeader
             id="how-title"
             eyebrow="02 / How it works"
-            title="From scan to safest path in three steps"
+            title="From scan to safest path"
           />
         </Reveal>
         <ol className="lp-steps">
@@ -218,34 +210,34 @@ const FEATURES: { icon: ReactNode; title: string; body: string; tag?: string }[]
   {
     icon: <IconHeadWindow />,
     title: "Head-tracked 3D window",
-    body: "The webcam follows your head so the screen acts like a window into the chest. Lean to look around the ribs, no headset needed.",
+    body: "The view follows your head, like a window into the chest.",
     tag: "MediaPipe",
   },
   {
     icon: <IconHandNeedle />,
     title: "Hand-aimed needle",
-    body: "Pinch in the air to aim. Entry point, depth and angle update as your hand moves.",
+    body: "Pinch in the air to aim the needle.",
     tag: "MediaPipe",
   },
   {
     icon: <IconSkinMap />,
     title: "Safe-zone skin map",
-    body: "Every point on the skin is shaded by the risk of its best route, so the safe windows between ribs stand out at a glance.",
+    body: "Safe gaps between the ribs show up on the skin.",
   },
   {
     icon: <IconSlice />,
     title: "Live CT slice",
-    body: "The original CT slice along the needle follows your aim, so the 3D view can always be checked against the real scan.",
+    body: "The real CT slice follows the needle as you aim.",
   },
   {
     icon: <IconPath />,
     title: "One-click safest path",
-    body: "Search candidate routes across the skin and get the lowest-risk one, with the numbers behind its score.",
+    body: "Pathfinder ranks every route and shows the numbers.",
   },
   {
     icon: <IconExplain />,
     title: "Doctor plan and patient explanation",
-    body: "Turns the chosen route into a structured plan for the doctor and a plain-language explanation for the patient.",
+    body: "Gemini writes a plan for the doctor and a summary for the patient.",
     tag: "Gemini",
   },
 ];
@@ -258,8 +250,8 @@ function Features() {
           <SectionHeader
             id="features-title"
             eyebrow="03 / Features"
-            title="Built for the planning room"
-            description="Everything a doctor needs to compare routes, and everything a patient needs to understand the one chosen."
+            title="What's in the planner"
+            description="Compare routes, then explain the one you pick."
           />
         </Reveal>
         <ul className="lp-features">
@@ -296,7 +288,7 @@ function Demo() {
             id="demo-title"
             eyebrow="04 / Demo"
             title="See it plan a real case"
-            description="A walkthrough on a de-identified scan from LIDC-IDRI: load the case, aim, compare routes, and generate the plan."
+            description="One de-identified LIDC-IDRI case, from scan to plan."
           />
         </Reveal>
         <Reveal delay={100}>
@@ -361,8 +353,12 @@ const STACK: { role: string; name: string; href: string; note?: string }[] = [
     href: "https://github.com/wasserth/TotalSegmentator",
   },
   { role: "3D", name: "three.js", href: "https://threejs.org" },
-  { role: "Head + hand tracking", name: "MediaPipe", href: "https://ai.google.dev/edge/mediapipe" },
-  { role: "Plans + explanations", name: "Gemini", href: "https://ai.google.dev/gemini-api" },
+  {
+    role: "Head and hand tracking",
+    name: "MediaPipe",
+    href: "https://ai.google.dev/edge/mediapipe",
+  },
+  { role: "Plans and summaries", name: "Gemini", href: "https://ai.google.dev/gemini-api" },
 ];
 
 function BuiltWith() {

@@ -5,8 +5,8 @@ export default function Hologram() {
   return (
     <ComingSoon
       eyebrow="/hologram"
-      title="Hologram view is on its way"
-      description="A head-tracked 3D window into the patient's chest: lean to look around the ribs, no headset needed."
+      title="The hologram view isn't ready yet"
+      description="A head-tracked 3D view. Lean to look around the ribs."
     />
   );
 }

@@ -229,6 +229,7 @@ Props: `setup`, `pixelSize` (default 3), `levels` (2 or 3; default from `--dithe
 
 - `view="hero"` (landing hero): the anatomy (ribs, spine, lungs) plus a decorative needle search (`scenes/needleSearch.ts`). A blue (`--needle`) bevelled needle with a hub, metal shading, a brighter tip and a soft glow advances from outside the chest toward a pulsing white target in the lung. It takes about 0.6 s, slows as it pierces the skin, leaves a grey track, and is scaled so the shaft stays about 3 px wide on screen. The hold after the colour appears is about 0.7 s (longer for the safe attempt), the withdraw about 0.35 s and the gap about 0.2 s, so a sequence takes about 5–6 s. When it stops, the track takes its risk colour and a label appears at the entry. It holds, withdraws and fades, and the last two tracks stay faintly as search history. Each sequence is 2–3 caution, danger or blocked attempts, then a safe one. Everything is drawn crisp on the overlay layer (the scene's lights are enabled on it so the needle is shaded) and rotates with the model. Entries are chosen so the path runs across the screen and stays in view. With reduced motion, one static safe track and its label are shown, with no needle and no loop. It is interactive (`scenes/heroControls.ts`). It follows the mouse up to ±60° left-right and ±25° up-down with damping. Drag spins it a full 360°, the wheel or a pinch zooms in a little, it drifts back after release, and it auto-rotates when idle. Touch drag works on phones, and vertical swipes still scroll the page. With reduced motion there is no auto-rotate, the follow range is smaller, and it snaps to input instead of easing. `onFirstInteraction` fires once, which the landing page uses to fade its hint.
 - `view="poster"` (demo poster): slow sway with a white needle. Set `riskPreview` and `needle.segments` to colour the path with risk markers.
+- The "Aim and see the risk" card reuses the hero scene through `createHeroScene({ interactive: false, fails: { min: 1, max: 2 } })`, exported as `needleCardScene` from `scenes/anatomy.ts`. It has the same needle, tracks and labels, ignores input, sways gently, centres the model and runs a shorter loop. Like every `DitherCanvas`, it only animates while on screen.
 
 Both take real pipeline meshes:
 
@@ -244,6 +245,17 @@ Both take real pipeline meshes:
 The models are rotated from CT patient space (LPS) to three.js y-up, centred and scaled to fit. If they fail to load, the procedural meshes stay.
 
 ---
+
+## Writing
+
+All UI text follows these rules, including the planner's.
+
+- Short. Cut every word that doesn't add meaning. One idea per sentence.
+- Plain, specific words. Never use: seamless, empower, revolutionize, unlock, elevate, cutting-edge, harness, leverage, transform, game-changing, robust, journey, landscape, delve, "in today's world".
+- No em dashes, rhetorical questions, exclamation marks or emoji. No "not just X, but Y". No lists of exactly three adjectives.
+- Active voice and present tense: "Pathfinder scores each route", not "Each route is scored".
+- Sentence-case headings, short and concrete.
+- Careful medical claims: "helps plan", never "prevents" or "guarantees". Keep the disclaimer and the data credits.
 
 ## Building `/planner` with the theme
 

@@ -381,6 +381,13 @@ function addLights(scene: THREE.Scene, alsoLayers: number[] = []) {
 export interface HeroSceneOptions {
   models?: AnatomyModels;
   modelRotation?: Vec3;
+  /**
+   * true (hero): mouse-follow, drag, zoom and idle spin, model a little right of centre.
+   * false (e.g. a card illustration): a gentle automatic sway, centred, no input.
+   */
+  interactive?: boolean;
+  /** Failed needle attempts before the safe one (see NeedleSearch). */
+  fails?: { min: number; max: number };
 }
 
 /** Camera layer drawn undithered on top (candidate paths, target). */
@@ -399,7 +406,7 @@ const FRAME_CENTRE_Y = -0.02;
  * search drawn crisp on top (needleSearch.ts).
  */
 export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetup {
-  const { models, modelRotation = [-Math.PI / 2, 0, 0] } = options;
+  const { models, modelRotation = [-Math.PI / 2, 0, 0], interactive = true, fails } = options;
 
   return ({ scene, camera, renderer, reducedMotion, invalidate }) => {
     const fog = new THREE.Fog(0x000000, 5, 8.5);
@@ -415,10 +422,9 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
     procedural.add(ribGroup, buildLung(-1), buildLung(1));
     body.add(procedural);
 
-    const controls = new HeroControls(renderer.domElement, {
-      reducedMotion,
-      invalidate,
-    });
+    const controls = interactive
+      ? new HeroControls(renderer.domElement, { reducedMotion, invalidate })
+      : null;
 
     // Decorative needle search: crisp overlay layer + HTML labels over the canvas.
     const labelLayer = document.createElement("div");
@@ -432,6 +438,7 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
       labelLayer,
       layer: OVERLAY_LAYER,
       reducedMotion,
+      fails,
     });
 
     let cancelled = false;
@@ -458,9 +465,17 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
 
     return {
       overlayLayer: OVERLAY_LAYER,
-      update({ delta }) {
-        controls.update(delta);
-        body.rotation.set(controls.pitch, controls.yaw, 0);
+      update({ delta, time }) {
+        let zoom = 1;
+        if (controls) {
+          controls.update(delta);
+          body.rotation.set(controls.pitch, controls.yaw, 0);
+          zoom = controls.zoom;
+        } else {
+          // Non-interactive: a slow sway around a three-quarter view.
+          const sway = reducedMotion ? 0 : Math.sin(time * 0.35) * 0.3;
+          body.rotation.set(0.06, 0.35 + sway, 0);
+        }
 
         // Fit the anatomy to the canvas (~80% of its height, or most of its width if
         // narrower), sitting a little right of centre.
@@ -468,9 +483,9 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
         const fitHeight = FRAME_HEIGHT / (0.78 * 2 * tanHalf);
         // Narrow canvases leave side room for the path labels.
         const fitWidth = FRAME_WIDTH / ((narrow ? 0.72 : 0.9) * 2 * tanHalf * camera.aspect);
-        const distance = Math.max(fitHeight, fitWidth) / controls.zoom;
+        const distance = Math.max(fitHeight, fitWidth) / zoom;
         const visibleWidth = 2 * distance * tanHalf * camera.aspect;
-        const x = narrow ? 0 : -0.06 * visibleWidth;
+        const x = narrow || !interactive ? 0 : -0.06 * visibleWidth;
         camera.position.set(x, FRAME_CENTRE_Y, distance);
         camera.lookAt(x, FRAME_CENTRE_Y, 0);
         camera.updateMatrixWorld();
@@ -483,7 +498,7 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
       },
       dispose() {
         cancelled = true;
-        controls.dispose();
+        controls?.dispose();
         needle.dispose();
         labelLayer.remove();
         disposeObject(scene);
@@ -632,3 +647,9 @@ export function createAnatomyScene(options: AnatomySceneOptions = {}): DitherSce
     };
   };
 }
+
+/** "Aim and see the risk" card: the hero's needle search, non-interactive, shorter loop. */
+export const needleCardScene: DitherSceneSetup = createHeroScene({
+  interactive: false,
+  fails: { min: 1, max: 2 },
+});

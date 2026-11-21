@@ -66,8 +66,8 @@ export function HeroAnatomy({
 
   const defaultLabel =
     view === "hero"
-      ? "Interactive stylised 3D ribcage, spine and lungs. Move the mouse to tilt it, drag to spin it, and scroll or pinch to zoom."
-      : "Stylised 3D ribcage and lungs with a needle path to a target.";
+      ? "Stylised 3D ribcage and lungs. A blue needle tries routes to a target. Move the mouse to tilt, drag to spin, scroll to zoom."
+      : "Stylised 3D ribcage and lungs with a needle aimed at a target.";
 
   return (
     <div ref={wrapRef} className={className}>

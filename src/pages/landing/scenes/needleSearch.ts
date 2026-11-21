@@ -108,6 +108,8 @@ export interface NeedleSearchOptions {
   /** Camera layer drawn as an undithered overlay. */
   layer: number;
   reducedMotion: boolean;
+  /** Failed attempts before the safe one. The lower count is used ~70% of the time. */
+  fails?: { min: number; max: number };
 }
 
 function pick<T>(list: readonly T[]): T {
@@ -372,7 +374,9 @@ export class NeedleSearch {
   }
 
   private newSequence() {
-    const fails = Math.random() < 0.7 ? 2 : 3;
+    const { min, max } = this.opts.fails ?? { min: 2, max: 3 };
+    const fails =
+      Math.random() < 0.7 || max <= min ? min : min + 1 + Math.floor(Math.random() * (max - min));
     this.queue = [];
     for (let i = 0; i < fails; i++) {
       const r = Math.random();
