@@ -9,13 +9,14 @@
 
 :root {
   /* ---------- Raw palette (use the semantic tokens below in components) ---------- */
-  --pf-navy-950: #071330;
-  --pf-navy-900: #0b1b3f; /* page background */
-  --pf-navy-800: #11264f; /* surface */
-  --pf-navy-700: #1a335f; /* raised surface, borders */
-  --pf-navy-600: #284676; /* strong borders */
-  --pf-teal-500: #1fb5a0; /* primary */
-  --pf-teal-400: #45ccb7; /* primary hover */
+  --pf-navy-950: #03060f; /* deepest: footer, insets */
+  --pf-navy-900: #050a18; /* page background (near-black navy) */
+  --pf-navy-800: #0b1426; /* surface */
+  --pf-navy-700: #111c33; /* raised surface */
+  --pf-navy-600: #1a2640; /* borders */
+  --pf-navy-500: #24324f; /* strong borders */
+  --pf-teal-500: #2ccdb4; /* primary */
+  --pf-teal-400: #62e0cc; /* primary hover */
   --pf-amber-500: #f5b03c; /* accent: targets, highlights, main CTA only */
   --pf-amber-400: #ffc463; /* accent hover */
   --pf-white: #eaf0f7; /* off-white text */
@@ -26,26 +27,33 @@
   --color-bg-deep: var(--pf-navy-950);
   --color-surface: var(--pf-navy-800);
   --color-surface-raised: var(--pf-navy-700);
-  --color-border: rgb(154 171 199 / 0.16);
-  --color-border-strong: var(--pf-navy-600);
+  --color-border: var(--pf-navy-600);
+  --color-border-strong: var(--pf-navy-500);
 
   --color-primary: var(--pf-teal-500);
   --color-primary-hover: var(--pf-teal-400);
-  --color-primary-soft: rgb(31 181 160 / 0.14);
+  --color-primary-soft: color-mix(in srgb, var(--pf-teal-500) 14%, transparent);
+  --color-primary-border: color-mix(in srgb, var(--pf-teal-500) 45%, transparent);
   --color-on-primary: var(--pf-navy-900);
 
   --color-accent: var(--pf-amber-500);
   --color-accent-hover: var(--pf-amber-400);
-  --color-accent-soft: rgb(245 176 60 / 0.14);
+  --color-accent-soft: color-mix(in srgb, var(--pf-amber-500) 14%, transparent);
+  --color-accent-border: color-mix(in srgb, var(--pf-amber-500) 40%, transparent);
   --color-on-accent: var(--pf-navy-900);
 
   --color-text: var(--pf-white);
   --color-text-muted: var(--pf-grey-blue);
   --color-focus: var(--pf-amber-500);
 
-  /* Dither palette: read by <DitherCanvas> at runtime */
+  /* Translucent backgrounds, derived from the palette above */
+  --color-bg-translucent: color-mix(in srgb, var(--pf-navy-900) 80%, transparent); /* sticky nav */
+  --color-scrim: color-mix(in srgb, var(--pf-navy-950) 55%, transparent); /* soft overlay */
+  --color-scrim-strong: color-mix(in srgb, var(--pf-navy-950) 85%, transparent); /* label backing */
+
+  /* Dither palette: read by <DitherCanvas> at runtime. bg must equal --color-bg. */
   --dither-bg: var(--pf-navy-900);
-  --dither-mid: var(--pf-navy-700);
+  --dither-mid: var(--pf-navy-600);
   --dither-fg: var(--pf-teal-500);
   --dither-accent: var(--pf-amber-500);
 
@@ -96,11 +104,17 @@
   --radius-pill: 999px;
 
   /* ---------- Shadows ---------- */
-  --shadow-sm: 0 1px 2px rgb(3 10 28 / 0.4);
-  --shadow-md: 0 6px 18px -6px rgb(3 10 28 / 0.6);
-  --shadow-lg: 0 24px 48px -16px rgb(3 10 28 / 0.75);
-  --shadow-glow-primary: 0 0 0 1px rgb(31 181 160 / 0.35), 0 8px 32px -8px rgb(31 181 160 / 0.45);
-  --shadow-glow-accent: 0 0 0 1px rgb(245 176 60 / 0.4), 0 8px 32px -8px rgb(245 176 60 / 0.5);
+  /* Elevation comes from 1px borders; shadows stay minimal on the dark background. */
+  --shadow-sm: none;
+  --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 24px -14px rgb(0 0 0 / 0.8);
+  --shadow-inset: inset 0 1px 2px rgb(0 0 0 / 0.5);
+  --shadow-glow-primary:
+    0 0 0 1px var(--color-primary-border),
+    0 6px 24px -8px color-mix(in srgb, var(--pf-teal-500) 40%, transparent);
+  --shadow-glow-accent:
+    0 0 0 1px var(--color-accent-border),
+    0 6px 24px -8px color-mix(in srgb, var(--pf-amber-500) 45%, transparent);
 
   /* ---------- Motion ---------- */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);

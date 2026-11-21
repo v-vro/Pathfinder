@@ -20,29 +20,44 @@ The design system for every Pathfinder screen: the landing page, `/planner`, `/h
 
 Always use the **semantic** tokens. The raw `--pf-*` palette exists only so the semantic tokens have something to point at.
 
-| Token                    | Value               | Use                                                 |
-| ------------------------ | ------------------- | --------------------------------------------------- |
-| `--color-bg`             | `#0B1B3F` deep navy | Page background                                     |
-| `--color-bg-deep`        | `#071330`           | Footer, inset wells, video/3D viewports             |
-| `--color-surface`        | `#11264F`           | Panels and cards                                    |
-| `--color-surface-raised` | `#1A335F`           | Panels on panels, badges, popovers                  |
-| `--color-border`         | grey-blue @ 16%     | Default hairlines                                   |
-| `--color-border-strong`  | `#284676`           | Inputs, toggles, emphasised dividers                |
-| `--color-primary`        | `#1FB5A0` teal      | Links, secondary buttons, safe path, active states  |
-| `--color-primary-hover`  | `#45CCB7`           | Hover for teal elements                             |
-| `--color-primary-soft`   | teal @ 14%          | Teal tinted backgrounds (icon tiles, selected rows) |
-| `--color-on-primary`     | navy                | Text on a solid teal fill                           |
-| `--color-accent`         | `#F5B03C` amber     | **Targets, highlights, main CTA only**              |
-| `--color-accent-hover`   | `#FFC463`           | Hover for the main CTA                              |
-| `--color-accent-soft`    | amber @ 14%         | Amber tinted backgrounds                            |
-| `--color-on-accent`      | navy                | Text on amber                                       |
-| `--color-text`           | `#EAF0F7` off-white | Body and headings                                   |
-| `--color-text-muted`     | `#9AABC7` grey-blue | Secondary text, captions, labels                    |
-| `--color-focus`          | amber               | Focus outlines (set globally on `:focus-visible`)   |
+| Token                                    | Value                     | Use                                                             |
+| ---------------------------------------- | ------------------------- | --------------------------------------------------------------- |
+| `--color-bg`                             | `#050A18` near-black navy | Page background                                                 |
+| `--color-bg-deep`                        | `#03060F`                 | Footer, inset wells, video/3D viewports                         |
+| `--color-surface`                        | `#0B1426`                 | Panels and cards                                                |
+| `--color-surface-raised`                 | `#111C33`                 | Panels on panels, badges, popovers                              |
+| `--color-border`                         | `#1A2640`                 | Default 1px borders (elevation comes from borders, not shadows) |
+| `--color-border-strong`                  | `#24324F`                 | Inputs, toggles, emphasised dividers                            |
+| `--color-primary`                        | `#2CCDB4` teal            | Links, secondary buttons, safe path, active states              |
+| `--color-primary-hover`                  | `#62E0CC`                 | Hover for teal elements                                         |
+| `--color-primary-soft`                   | teal @ 14%                | Teal tinted backgrounds (icon tiles, selected rows)             |
+| `--color-primary-border`                 | teal @ 45%                | Teal outlines (secondary button, hovered cards, teal badge)     |
+| `--color-on-primary`                     | `#050A18`                 | Text on a solid teal fill                                       |
+| `--color-accent`                         | `#F5B03C` amber           | **Targets, highlights, main CTA only**                          |
+| `--color-accent-hover`                   | `#FFC463`                 | Hover for the main CTA                                          |
+| `--color-accent-soft`                    | amber @ 14%               | Amber tinted backgrounds                                        |
+| `--color-accent-border`                  | amber @ 40%               | Amber outlines (accent badge)                                   |
+| `--color-on-accent`                      | `#050A18`                 | Text on amber                                                   |
+| `--color-text`                           | `#EAF0F7` off-white       | Headings and body                                               |
+| `--color-text-muted`                     | `#9AABC7` grey-blue       | Secondary text, captions, labels                                |
+| `--color-focus`                          | amber                     | Focus outlines (set globally on `:focus-visible`)               |
+| `--color-bg-translucent`                 | bg @ 80%                  | Sticky navbar behind the blur                                   |
+| `--color-scrim` / `--color-scrim-strong` | bg-deep @ 55% / 85%       | Overlays and label backings on top of graphics                  |
 
-Contrast on `--color-bg`: text about 16:1, muted text about 7:1, teal about 6.6:1, navy on amber about 9:1. All pass WCAG AA for body text.
+The `@ n%` tokens are built with `color-mix()` from the raw palette, so changing a base colour updates its tints too. Never write `rgb(… / alpha)` in component CSS; add or use one of these tokens instead.
 
-Dither palette, read at runtime by `DitherCanvas`: `--dither-bg` (navy), `--dither-mid` (`#1A335F`), `--dither-fg` (teal), `--dither-accent` (amber).
+**Contrast (WCAG 2.1):**
+
+| Text                 | on bg  | on bg-deep | on surface | on surface-raised |
+| -------------------- | ------ | ---------- | ---------- | ----------------- |
+| `--color-text`       | 17.2:1 | 17.7:1     | 16.0:1     | 14.8:1            |
+| `--color-text-muted` | 8.5:1  | 8.7:1      | 7.9:1      | 7.3:1             |
+| `--color-primary`    | 9.9:1  | 10.1:1     | 9.2:1      | 8.5:1             |
+| `--color-accent`     | 10.5:1 | 10.8:1     | 9.8:1      | 9.0:1             |
+
+Navy on teal is 9.9:1 (12.3:1 on hover), and navy on amber is 10.5:1 (12.5:1 on hover). Teal text on `--color-primary-soft` is at least 7.1:1, and amber text on `--color-accent-soft` is 7.6:1. Every text pair passes AA, and nearly all pass AAA. The 1px borders (about 1.3:1) are decorative separators. Don't rely on a border alone to show that something is a control or what state it is in; use a fill, an icon or text as well.
+
+Dither palette, read at runtime by `DitherCanvas`: `--dither-bg` (`#050A18`, must equal `--color-bg` so canvases have no visible edge), `--dither-mid` (`#1A2640`), `--dither-fg` (teal `#2CCDB4`), `--dither-accent` (amber).
 
 ### Type
 
@@ -63,13 +78,13 @@ The `.pf-mono` utility class gives the standard small uppercase technical label 
 
 ### Spacing, radius, shadow, motion, layout
 
-| Group              | Tokens                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| Spacing (4px base) | `--space-1` 4 · `-2` 8 · `-3` 12 · `-4` 16 · `-5` 24 · `-6` 32 · `-7` 48 · `-8` 64 · `-9` 96 · `-10` 128           |
-| Radius             | `--radius-sm` 6 · `-md` 10 · `-lg` 16 (panels) · `-xl` 24 · `-pill`                                                |
-| Shadow             | `--shadow-sm` · `-md` · `-lg` · `--shadow-glow-primary` · `--shadow-glow-accent`                                   |
-| Motion             | `--ease-out`, `--ease-in-out`, `--duration-fast` 140ms · `-base` 240ms · `-slow` 700ms (all 0 with reduced motion) |
-| Layout             | `--container-max` 1200px, `--container-pad`, `--nav-height` 64px, `--z-nav`, `--z-overlay`                         |
+| Group              | Tokens                                                                                                                                                                   |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Spacing (4px base) | `--space-1` 4 · `-2` 8 · `-3` 12 · `-4` 16 · `-5` 24 · `-6` 32 · `-7` 48 · `-8` 64 · `-9` 96 · `-10` 128                                                                 |
+| Radius             | `--radius-sm` 6 · `-md` 10 · `-lg` 16 (panels) · `-xl` 24 · `-pill`                                                                                                      |
+| Shadow             | `--shadow-sm` (none) · `-md` (1px lift) · `-lg` (soft, hover only) · `--shadow-inset` · `--shadow-glow-primary` · `--shadow-glow-accent`. Prefer borders for separation. |
+| Motion             | `--ease-out`, `--ease-in-out`, `--duration-fast` 140ms · `-base` 240ms · `-slow` 700ms (all 0 with reduced motion)                                                       |
+| Layout             | `--container-max` 1200px, `--container-pad`, `--nav-height` 64px, `--z-nav`, `--z-overlay`                                                                               |
 
 ### Utility classes
 
