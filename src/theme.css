@@ -27,6 +27,10 @@
   --risk-caution: #eab308;
   --risk-danger: #ef4444;
 
+  /* ---------- Needle: reserved for the biopsy needle only (landing hero and planner). ---------- */
+  /* Never for UI, never for risk. Risk colours go on the track behind the needle, not on it. */
+  --needle: #3b82f6;
+
   /* ---------- Semantic colours ---------- */
   --color-bg: var(--pf-black);
   --color-bg-deep: var(--pf-black);

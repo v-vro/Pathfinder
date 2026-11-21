@@ -4,15 +4,16 @@ import { RISK_WORD, riskIconSvg, type RiskLevel } from "../../../components/risk
 /**
  * Decorative "needle search" for the landing hero.
  *
- * One attempt at a time: a monochrome biopsy needle appears outside the chest, lined up
- * on a straight path to the target, advances (slowing as it pierces the skin), leaving a
- * thin grey track. When it stops, the track takes its risk colour and a label appears at
- * the entry point. It holds, pulls back out and fades; the track and label linger, then
- * the track stays faintly as search history. A sequence is 2-3 failed attempts (caution,
- * danger, or blocked by a rib) and then a safe one, after which it restarts.
+ * One attempt at a time: a blue (--needle) biopsy needle appears outside the chest, lined
+ * up on a straight path to the target, and advances (slowing as it pierces the skin),
+ * leaving a thin grey track. When it stops, the track takes its risk colour and a label
+ * appears at the entry point. It holds, pulls back out and fades, while the next attempt
+ * starts and the old track and label fade into faint search history. A sequence is 2-3
+ * failed attempts (caution, danger, or blocked by a rib) and then a safe one (~5-6 s).
  *
  * Everything lives on an overlay camera layer, so <DitherCanvas> draws it crisp on top of
- * the 1-bit anatomy, and is parented to the model, so it rotates with it.
+ * the 1-bit anatomy, and is parented to the model, so it rotates with it. Risk colours are
+ * only ever on the track, never on the needle.
  * Outcomes, colours and reasons are illustrative only, not computed.
  */
 
@@ -36,23 +37,27 @@ const NEEDLE_LENGTH = 0.5;
 const SHAFT_RADIUS = 0.0065;
 const BEVEL_LENGTH = 0.045;
 const TRACK_RADIUS = 0.005;
+/** Target on-screen shaft thickness in CSS px; the needle is scaled up to reach it. */
+const SHAFT_PX = 3;
 /** How far outside the skin the needle tip starts. */
 const START_OUTSIDE = 0.3;
 
-// Timing (seconds).
-const APPEAR = 0.3;
-const ADVANCE_SPEED = 0.62; // units/s before slow-downs; most attempts take ~1-1.5 s
-const HOLD = 1.5;
-const HOLD_SAFE = 2.6;
-const WITHDRAW = 0.8;
-const LINGER = 0.7;
-const FADE = 0.6;
-const GAP = 0.35;
+// Timing (seconds). One failed attempt ≈ 1.75 s, the safe one ≈ 2.25 s.
+const INSERT = 0.55; // full-length insertion; shorter travel (blocked) is quicker
+const FADE_IN = 0.1;
+const HOLD = 0.65;
+const HOLD_SAFE = 0.95;
+const WITHDRAW = 0.35;
+const GAP = 0.2;
+const GAP_RESTART = 0.4;
+// Track + label after the needle has gone (runs alongside the next attempt).
+const LINGER = 0.2;
+const FADE = 0.35;
 
 const HISTORY = 2;
 const HISTORY_OPACITY = 0.28;
 
-type Phase = "appear" | "advance" | "hold" | "withdraw" | "linger" | "fade";
+type Phase = "advance" | "hold" | "withdraw";
 
 interface Track {
   mesh: THREE.Mesh<THREE.TubeGeometry, THREE.MeshBasicMaterial>;
@@ -70,7 +75,8 @@ interface Attempt {
   normal: THREE.Vector3;
   dir: THREE.Vector3;
   length: number;
-  skinDistance: number;
+  /** Advance speed scale so the insertion takes the planned time. */
+  speed: number;
   track: Track;
   label: HTMLDivElement;
   labelWidth: number;
@@ -78,6 +84,12 @@ interface Attempt {
   t: number;
   d: number;
   labelAlpha: number;
+}
+
+/** An attempt whose needle is gone: its track and label linger, then fade. */
+interface Fading {
+  attempt: Attempt;
+  t: number;
 }
 
 export interface RibCurve {
@@ -106,9 +118,90 @@ function readColour(css: CSSStyleDeclaration, name: string, fallback: string) {
   return new THREE.Color(css.getPropertyValue(name).trim() || fallback);
 }
 
+const smooth = THREE.MathUtils.smoothstep;
+
+/** Relative speed along the path: eases in, dips as the tip pierces the skin, eases out. */
+function speedProfile(d: number, length: number): number {
+  const easeIn = 0.35 + 0.65 * smooth(d, 0, 0.08);
+  const skin = 1 - 0.4 * Math.max(0, 1 - Math.abs(d - START_OUTSIDE) / 0.06);
+  const easeOut = 0.35 + 0.65 * smooth(length - d, 0, 0.12);
+  return easeIn * skin * easeOut;
+}
+
+/** Speed scale that makes the insertion over `length` take `seconds`. */
+function speedFor(length: number, seconds: number): number {
+  // time = ∫ dd / (k · profile(d))  →  k = ∫ dd / profile(d) / seconds
+  const steps = 120;
+  let integral = 0;
+  for (let i = 0; i < steps; i++) {
+    const d = ((i + 0.5) / steps) * length;
+    integral += length / steps / speedProfile(d, length);
+  }
+  return integral / seconds;
+}
+
+/** Soft glow around the shaft: brightest facing the camera, fading to nothing at the edges. */
+function glowMaterial(colour: THREE.Color): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: colour.clone() }, uOpacity: { value: 0 } },
+    vertexShader: /* glsl */ `
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vNormal = normalize(normalMatrix * normal);
+        vView = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        float f = pow(abs(dot(normalize(vNormal), normalize(vView))), 3.0);
+        gl_FragColor = vec4(uColor * f * uOpacity, 1.0);
+        #include <colorspace_fragment>
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: false,
+  });
+}
+
+interface NeedleParts {
+  group: THREE.Group;
+  materials: THREE.MeshStandardMaterial[];
+  glow: THREE.ShaderMaterial;
+  tipGlow: THREE.SpriteMaterial;
+}
+
 /** Needle pointing along +Y with its tip at the origin; shaft and hub extend along -Y. */
-function buildNeedle(material: THREE.Material): THREE.Group {
+function buildNeedle(colour: THREE.Color): NeedleParts {
   const group = new THREE.Group();
+
+  // Metal rod in the needle colour; a little emissive so the shaded side stays vivid.
+  const body = new THREE.MeshStandardMaterial({
+    color: colour,
+    emissive: colour.clone().multiplyScalar(0.35),
+    metalness: 0.55,
+    roughness: 0.28,
+    fog: false,
+    transparent: true,
+  });
+  // Slightly brighter tip.
+  const tipColour = colour.clone().lerp(new THREE.Color(0xffffff), 0.45);
+  const tip = new THREE.MeshStandardMaterial({
+    color: tipColour,
+    emissive: tipColour.clone().multiplyScalar(0.6),
+    metalness: 0.5,
+    roughness: 0.22,
+    fog: false,
+    transparent: true,
+  });
 
   const shaft = new THREE.CylinderGeometry(
     SHAFT_RADIUS,
@@ -135,16 +228,53 @@ function buildNeedle(material: THREE.Material): THREE.Group {
   const hub = new THREE.CylinderGeometry(0.017, 0.021, 0.07, 18);
   hub.translate(0, -NEEDLE_LENGTH - 0.035, 0);
 
-  for (const g of [shaft, bevel, collar, hub]) group.add(new THREE.Mesh(g, material));
-  return group;
+  group.add(new THREE.Mesh(shaft, body), new THREE.Mesh(bevel, tip));
+  group.add(new THREE.Mesh(collar, body), new THREE.Mesh(hub, body));
+
+  // Glow sleeve along the shaft, plus a small soft glow at the tip.
+  const glow = glowMaterial(colour);
+  const sleeve = new THREE.CylinderGeometry(
+    SHAFT_RADIUS * 4,
+    SHAFT_RADIUS * 4,
+    NEEDLE_LENGTH,
+    16,
+    1,
+    true,
+  );
+  sleeve.translate(0, -NEEDLE_LENGTH / 2, 0);
+  const sleeveMesh = new THREE.Mesh(sleeve, glow);
+  sleeveMesh.renderOrder = -1;
+  group.add(sleeveMesh);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 64;
+  const ctx = canvas.getContext("2d")!;
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, "rgba(255,255,255,0.9)");
+  g.addColorStop(0.4, "rgba(255,255,255,0.25)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  const tipGlow = new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(canvas),
+    color: tipColour,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: false,
+    transparent: true,
+  });
+  const sprite = new THREE.Sprite(tipGlow);
+  sprite.scale.setScalar(0.06);
+  group.add(sprite);
+
+  return { group, materials: [body, tip], glow, tipGlow };
 }
 
 export class NeedleSearch {
   private readonly opts: NeedleSearchOptions;
   private readonly risk: Record<RiskLevel, THREE.Color>;
   private readonly grey: THREE.Color;
-  private readonly needle: THREE.Group;
-  private readonly needleMaterial: THREE.MeshStandardMaterial;
+  private readonly needle: NeedleParts;
   private readonly targetDot: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
   private readonly targetHalo: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>;
   private readonly gaps: { a: THREE.CatmullRomCurve3; b: THREE.CatmullRomCurve3 }[] = [];
@@ -152,11 +282,12 @@ export class NeedleSearch {
 
   private queue: Outcome[] = [];
   private current: Attempt | null = null;
+  private fading: Fading[] = [];
   private history: Track[] = [];
-  private wait = 0.4;
+  private wait = 0.3;
   private hitTime = -10;
   private elapsed = 0;
-  private staticDone = false;
+  private staticAttempt: Attempt | null = null;
 
   private readonly v = new THREE.Vector3();
   private readonly n = new THREE.Vector3();
@@ -180,17 +311,9 @@ export class NeedleSearch {
       for (let i = 1; i < ribs.length - 2; i++) this.gaps.push({ a: ribs[i], b: ribs[i + 1] });
     }
 
-    this.needleMaterial = new THREE.MeshStandardMaterial({
-      color: 0xe8e8e8,
-      roughness: 0.35,
-      metalness: 0.2,
-      fog: false,
-      transparent: true,
-      opacity: 0,
-    });
-    this.needle = buildNeedle(this.needleMaterial);
-    this.needle.visible = false;
-    this.addToOverlay(this.needle, 4);
+    this.needle = buildNeedle(readColour(css, "--needle", "#3b82f6"));
+    this.needle.group.visible = false;
+    this.addToOverlay(this.needle.group, 4);
 
     this.targetDot = new THREE.Mesh(
       new THREE.SphereGeometry(0.024, 16, 12),
@@ -216,7 +339,7 @@ export class NeedleSearch {
   private addToOverlay(obj: THREE.Object3D, order: number) {
     obj.traverse((o) => {
       o.layers.set(this.opts.layer);
-      o.renderOrder = order;
+      if (o.renderOrder === 0) o.renderOrder = order;
     });
     this.opts.parent.add(obj);
   }
@@ -245,11 +368,11 @@ export class NeedleSearch {
 
   /** 0 when the entry point has turned behind the model, 1 when it is clearly in view. */
   private visibility(point: THREE.Vector3, normal: THREE.Vector3, camera: THREE.Camera) {
-    return THREE.MathUtils.smoothstep(this.facing(point, normal, camera), -0.2, 0.12);
+    return smooth(this.facing(point, normal, camera), -0.2, 0.12);
   }
 
   private newSequence() {
-    const fails = Math.random() < 0.5 ? 2 : 3;
+    const fails = Math.random() < 0.7 ? 2 : 3;
     this.queue = [];
     for (let i = 0; i < fails; i++) {
       const r = Math.random();
@@ -258,7 +381,7 @@ export class NeedleSearch {
     this.queue.push("safe");
   }
 
-  /** Choose skin entry + stop point, preferring entries that face the camera. */
+  /** Choose skin entry + stop point that will be clearly visible on screen. */
   private plan(outcome: Outcome, camera: THREE.Camera) {
     const target = this.opts.target;
     let best: { skin: THREE.Vector3; normal: THREE.Vector3; rib: THREE.Vector3 | null } | null =
@@ -282,7 +405,7 @@ export class NeedleSearch {
       // The entry must be on the visible side now and after the idle spin carries the
       // model round during the attempt (it rotates about +Y).
       const facingNow = this.facing(skin, normal, camera);
-      const facingLater = this.facingAfterSpin(skin, normal, camera, 0.7);
+      const facingLater = this.facingAfterSpin(skin, normal, camera, 0.4);
       let score = Math.min(facingNow, facingLater) < 0.1 ? -3 : 0;
       // ...and the path should run across the screen, not straight into it.
       dirWorld.copy(target).sub(skin).normalize().transformDirection(this.opts.parent.matrixWorld);
@@ -336,6 +459,30 @@ export class NeedleSearch {
     return { mesh, skin, normal, opacity: 1, dying: false };
   }
 
+  private createAttempt(outcome: Outcome, p: ReturnType<NeedleSearch["plan"]>): Attempt {
+    const { el, width } = this.makeLabel(outcome);
+    const length = p.start.distanceTo(p.stop);
+    // Full insertions take INSERT seconds; short ones (blocked at a rib) are quicker.
+    const seconds = INSERT * THREE.MathUtils.clamp(length / 0.8, 0.55, 1);
+    return {
+      outcome,
+      start: p.start,
+      skin: p.skin,
+      stop: p.stop,
+      normal: p.normal,
+      dir: p.dir,
+      length,
+      speed: speedFor(length, seconds),
+      track: this.makeTrack(p.start, p.stop, p.skin, p.normal),
+      label: el,
+      labelWidth: width,
+      phase: "advance",
+      t: 0,
+      d: 0,
+      labelAlpha: 0,
+    };
+  }
+
   private startAttempt(camera: THREE.Camera) {
     if (this.queue.length === 0) this.newSequence();
     const outcome = this.queue.shift()!;
@@ -343,57 +490,15 @@ export class NeedleSearch {
     if (!p.visible) {
       // Nothing usable faces the camera right now (e.g. mid-spin): try again shortly.
       this.queue.unshift(outcome);
-      this.wait = 0.3;
+      this.wait = 0.2;
       return;
     }
-    const { el, width } = this.makeLabel(outcome);
-    this.current = {
-      outcome,
-      start: p.start,
-      skin: p.skin,
-      stop: p.stop,
-      normal: p.normal,
-      dir: p.dir,
-      length: p.start.distanceTo(p.stop),
-      skinDistance: START_OUTSIDE,
-      track: this.makeTrack(p.start, p.stop, p.skin, p.normal),
-      label: el,
-      labelWidth: width,
-      phase: "appear",
-      t: 0,
-      d: 0,
-      labelAlpha: 0,
-    };
-    this.needle.quaternion.setFromUnitVectors(this.up, p.dir);
-  }
-
-  /** Reduced motion: one static safe track with its label, no needle, no loop. */
-  private showStatic(camera: THREE.Camera) {
-    const p = this.plan("safe", camera);
-    const { el, width } = this.makeLabel("safe");
-    const track = this.makeTrack(p.start, p.stop, p.skin, p.normal);
-    track.mesh.geometry.setDrawRange(0, Infinity);
-    track.mesh.material.color.copy(this.risk.safe);
-    this.current = {
-      outcome: "safe",
-      start: p.start,
-      skin: p.skin,
-      stop: p.stop,
-      normal: p.normal,
-      dir: p.dir,
-      length: p.start.distanceTo(p.stop),
-      skinDistance: START_OUTSIDE,
-      track,
-      label: el,
-      labelWidth: width,
-      phase: "hold",
-      t: 0,
-      d: 0,
-      labelAlpha: 1,
-    };
+    this.current = this.createAttempt(outcome, p);
+    this.needle.group.quaternion.setFromUnitVectors(this.up, p.dir);
   }
 
   private retire(track: Track) {
+    track.opacity = HISTORY_OPACITY;
     this.history.push(track);
     // Keep only the last few faint tracks.
     const alive = this.history.filter((h) => !h.dying);
@@ -406,21 +511,27 @@ export class NeedleSearch {
     track.mesh.material.dispose();
   }
 
-  /** Advance the animation and position the label. Call after the parent's matrixWorld is current. */
-  update(dt: number, camera: THREE.Camera, width: number, height: number): void {
+  private setNeedleOpacity(opacity: number) {
+    for (const m of this.needle.materials) m.opacity = opacity;
+    this.needle.glow.uniforms.uOpacity.value = 0.55 * opacity;
+    this.needle.tipGlow.opacity = 0.8 * opacity;
+    this.needle.group.visible = opacity > 0.01;
+  }
+
+  /** Keep the shaft about SHAFT_PX thick on screen, whatever the distance or canvas size. */
+  private fitThickness(camera: THREE.PerspectiveCamera, height: number) {
+    const dist = this.needle.group.getWorldPosition(this.v).distanceTo(camera.position);
+    const pxPerUnit = height / (2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+    const scale = THREE.MathUtils.clamp(SHAFT_PX / pxPerUnit / (2 * SHAFT_RADIUS), 1, 3);
+    this.needle.group.scale.set(scale, 1, scale);
+  }
+
+  /** Advance the animation and position labels. Call after the parent's matrixWorld is current. */
+  update(dt: number, camera: THREE.PerspectiveCamera, width: number, height: number): void {
     this.elapsed += dt;
 
     if (this.opts.reducedMotion) {
-      if (!this.staticDone) {
-        this.staticDone = true;
-        this.showStatic(camera);
-      }
-      this.targetDot.scale.setScalar(1.15);
-      this.targetHalo.scale.setScalar(2.2);
-      const a = this.current!;
-      const vis = this.visibility(a.skin, a.normal, camera);
-      a.track.mesh.material.opacity = vis;
-      this.placeLabel(a, vis, camera, width, height);
+      this.updateStatic(camera, width, height);
       return;
     }
 
@@ -432,63 +543,84 @@ export class NeedleSearch {
     let a = this.current;
     // If the entry turns out of view before the needle stops, cancel and re-run this
     // attempt from a visible spot, so the search sequence is never shown half-hidden.
-    if (a && (a.phase === "appear" || a.phase === "advance")) {
-      if (this.visibility(a.skin, a.normal, camera) < 0.15) {
-        this.queue.unshift(a.outcome);
-        a.label.remove();
-        this.disposeTrack(a.track);
-        this.needle.visible = false;
-        this.current = a = null;
-        this.wait = 0.2;
-      }
+    if (a && a.phase === "advance" && this.visibility(a.skin, a.normal, camera) < 0.15) {
+      this.queue.unshift(a.outcome);
+      a.label.remove();
+      this.disposeTrack(a.track);
+      this.setNeedleOpacity(0);
+      this.current = a = null;
+      this.wait = 0.15;
     }
-    if (a) this.step(a, dt);
+    if (a) {
+      this.step(a, dt);
+      const vis = this.visibility(a.skin, a.normal, camera);
+      for (const m of this.needle.materials) m.opacity *= vis;
+      this.needle.glow.uniforms.uOpacity.value *= vis;
+      this.needle.tipGlow.opacity *= vis;
+      a.track.mesh.material.opacity *= vis;
+      this.fitThickness(camera, height);
+      this.placeLabel(a, a.labelAlpha * vis, camera, width, height);
+    }
+
+    // Finished attempts: coloured track and label linger, then fade into history.
+    for (const f of this.fading) {
+      f.t += dt;
+      const x = smooth(f.t, LINGER, LINGER + FADE);
+      const at = f.attempt;
+      const vis = this.visibility(at.skin, at.normal, camera);
+      const endOpacity = at.outcome === "safe" ? 0 : HISTORY_OPACITY;
+      at.track.mesh.material.opacity = (1 - (1 - endOpacity) * x) * vis;
+      this.placeLabel(at, (1 - x) * vis, camera, width, height);
+    }
+    for (const f of this.fading.filter((x) => x.t >= LINGER + FADE)) {
+      f.attempt.label.remove();
+      if (f.attempt.outcome === "safe") this.disposeTrack(f.attempt.track);
+      else this.retire(f.attempt.track);
+    }
+    this.fading = this.fading.filter((x) => x.t < LINGER + FADE);
 
     // History tracks: faint, fading out when dropped.
     for (const h of this.history) {
       const goal = h.dying ? 0 : HISTORY_OPACITY;
-      h.opacity += (goal - h.opacity) * (1 - Math.exp(-dt * 4));
+      h.opacity += (goal - h.opacity) * (1 - Math.exp(-dt * 6));
       h.mesh.material.opacity = h.opacity * this.visibility(h.skin, h.normal, camera);
     }
-    for (const h of this.history.filter((x) => x.dying && x.opacity < 0.01)) {
-      this.disposeTrack(h);
-    }
+    for (const h of this.history.filter((x) => x.dying && x.opacity < 0.01)) this.disposeTrack(h);
     this.history = this.history.filter((x) => !(x.dying && x.opacity < 0.01));
 
     // Target: gentle pulse, strong pulse after a safe hit.
     const sinceHit = this.elapsed - this.hitTime;
-    const hit = sinceHit < 2.2 ? Math.max(0, Math.sin(sinceHit * 9)) * (1 - sinceHit / 2.2) : 0;
+    const hit = sinceHit < 1.4 ? Math.max(0, Math.sin(sinceHit * 11)) * (1 - sinceHit / 1.4) : 0;
     const idle = 0.5 + 0.5 * Math.sin(this.elapsed * 3);
     this.targetDot.scale.setScalar(1 + idle * 0.15 + hit * 0.8);
     this.targetHalo.scale.setScalar(1.6 + idle * 0.8 + hit * 3);
     this.targetHalo.material.opacity = 0.2 + hit * 0.35;
+  }
 
-    if (a) {
-      const vis = this.visibility(a.skin, a.normal, camera);
-      this.needleMaterial.opacity *= vis;
-      a.track.mesh.material.opacity *= vis;
-      this.placeLabel(a, a.labelAlpha * vis, camera, width, height);
+  /** Reduced motion: one static safe track with its label, no needle, no loop. */
+  private updateStatic(camera: THREE.PerspectiveCamera, width: number, height: number) {
+    if (!this.staticAttempt) {
+      const a = this.createAttempt("safe", this.plan("safe", camera));
+      a.track.mesh.geometry.setDrawRange(0, Infinity);
+      a.track.mesh.material.color.copy(this.risk.safe);
+      this.staticAttempt = a;
+      this.targetDot.scale.setScalar(1.15);
+      this.targetHalo.scale.setScalar(2.2);
     }
+    const a = this.staticAttempt;
+    const vis = this.visibility(a.skin, a.normal, camera);
+    a.track.mesh.material.opacity = vis;
+    this.placeLabel(a, vis, camera, width, height);
   }
 
   private step(a: Attempt, dt: number) {
     a.t += dt;
     let needleOpacity = 1;
-    let trackOpacity = 1;
-    let labelAlpha = 0;
 
     switch (a.phase) {
-      case "appear":
-        needleOpacity = Math.min(a.t / APPEAR, 1);
-        if (a.t >= APPEAR) this.next(a, "advance");
-        break;
-      case "advance": {
-        // Ease in from rest, slow down as the tip pierces the skin and near the end.
-        const fromSkin = Math.abs(a.d - a.skinDistance);
-        const skinDip = 1 - 0.45 * Math.max(0, 1 - fromSkin / 0.08);
-        const ease = Math.min(1, 0.25 + a.t / 0.25);
-        const end = THREE.MathUtils.clamp((a.length - a.d) / 0.15, 0.3, 1);
-        a.d = Math.min(a.length, a.d + ADVANCE_SPEED * skinDip * ease * end * dt);
+      case "advance":
+        needleOpacity = Math.min(a.t / FADE_IN, 1);
+        a.d = Math.min(a.length, a.d + a.speed * speedProfile(a.d, a.length) * dt);
         if (a.d >= a.length - 1e-4) {
           a.d = a.length;
           a.track.mesh.material.color.copy(this.risk[LEVEL[a.outcome]]);
@@ -496,45 +628,29 @@ export class NeedleSearch {
           this.next(a, "hold");
         }
         break;
-      }
       case "hold":
-        labelAlpha = Math.min(a.t / 0.3, 1);
+        a.labelAlpha = Math.min(a.t / 0.15, 1);
         if (a.t >= (a.outcome === "safe" ? HOLD_SAFE : HOLD)) this.next(a, "withdraw");
         break;
       case "withdraw": {
         const x = Math.min(a.t / WITHDRAW, 1);
-        a.d = a.length - (a.length + 0.15) * x * x;
-        needleOpacity = 1 - Math.pow(x, 1.5);
-        labelAlpha = 1;
-        if (x >= 1) this.next(a, "linger");
-        break;
-      }
-      case "linger":
-        needleOpacity = 0;
-        labelAlpha = 1;
-        if (a.t >= LINGER) this.next(a, "fade");
-        break;
-      case "fade": {
-        const x = Math.min(a.t / FADE, 1);
-        needleOpacity = 0;
-        labelAlpha = 1 - x;
-        trackOpacity = 1 - (1 - HISTORY_OPACITY) * x;
-        if (x >= 1) this.finish(a);
+        const eased = x * x * (3 - 2 * x); // smooth start and stop
+        a.d = a.length - (a.length + 0.12) * eased;
+        needleOpacity = 1 - eased;
+        if (x >= 1) this.endAttempt(a);
         break;
       }
     }
 
     // Needle: tip at distance d along the line.
-    this.needle.visible = needleOpacity > 0.01;
-    this.needle.position.copy(a.start).addScaledVector(a.dir, a.d);
-    this.needleMaterial.opacity = needleOpacity;
+    this.needle.group.position.copy(a.start).addScaledVector(a.dir, a.d);
+    this.setNeedleOpacity(this.current ? needleOpacity : 0);
 
     // Track: the stretch travelled so far (full once it has stopped).
-    const reached = a.phase === "appear" ? 0 : a.phase === "advance" ? a.d / a.length : 1;
+    const reached = a.phase === "advance" ? a.d / a.length : 1;
     const count = a.track.mesh.geometry.index?.count ?? 0;
     a.track.mesh.geometry.setDrawRange(0, Math.floor((count * reached) / 6) * 6);
-    a.track.mesh.material.opacity = trackOpacity;
-    a.labelAlpha = labelAlpha;
+    a.track.mesh.material.opacity = 1;
   }
 
   private next(a: Attempt, phase: Phase) {
@@ -542,17 +658,15 @@ export class NeedleSearch {
     a.t = 0;
   }
 
-  private finish(a: Attempt) {
-    a.label.remove();
-    a.track.opacity = HISTORY_OPACITY;
-    this.retire(a.track);
+  /** Needle is out: hand the track and label to the fading list and queue the next attempt. */
+  private endAttempt(a: Attempt) {
     this.current = null;
-    this.needle.visible = false;
+    this.fading.push({ attempt: a, t: 0 });
     this.wait = GAP;
-    // After the safe attempt, clear the search history and start a new sequence.
+    // End of a sequence: clear the search history before the next one starts.
     if (a.outcome === "safe") {
       for (const h of this.history) h.dying = true;
-      this.wait = GAP + 0.6;
+      this.wait = GAP_RESTART;
     }
   }
 
@@ -585,13 +699,18 @@ export class NeedleSearch {
   }
 
   dispose(): void {
-    if (this.current) {
-      this.current.label.remove();
-      this.disposeTrack(this.current.track);
+    const attempts = [this.current, this.staticAttempt, ...this.fading.map((f) => f.attempt)];
+    for (const a of attempts) {
+      if (!a) continue;
+      a.label.remove();
+      this.disposeTrack(a.track);
     }
     for (const h of this.history) this.disposeTrack(h);
-    this.needle.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
-    this.needleMaterial.dispose();
+    this.needle.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    for (const m of this.needle.materials) m.dispose();
+    this.needle.glow.dispose();
+    this.needle.tipGlow.map?.dispose();
+    this.needle.tipGlow.dispose();
     this.targetDot.geometry.dispose();
     this.targetDot.material.dispose();
     this.targetHalo.geometry.dispose();
