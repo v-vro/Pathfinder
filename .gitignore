@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Raw data (DICOM / NIfTI / segmentations): regenerate with pipeline/fetch_case.py + segment.py
+data/
+
+# Web
+web/node_modules/
+web/dist/
+web/test-results/
+
+# Secrets
+.env
+
+# Raw third-party downloads (the processed body model lives in web/public/models/body)
+assets_incoming/
+*.log

@@ -1,0 +1,22 @@
+human.glb - adult human body surface
+
+Source:   MakeHuman base mesh "hm08" (body group only) + MakeHuman macro morph targets
+          https://github.com/makehumancommunity/makehuman
+          - makehuman/data/3dobjs/base.obj
+          - makehuman/data/targets/macrodetails/{african,asian,caucasian}-male-young.target
+Author:   MakeHuman Team / MakeHuman Community (original targets by Manuel Bastioni).
+          Copyright holders at time of CC0 release: Data Collection AB (https://www.datacollection.se),
+          Joel Palmius, Jonas Hauquier.
+License:  CC0 1.0 Universal (Public Domain Dedication)
+          https://creativecommons.org/publicdomain/zero/1.0/
+          Per the files' headers: "This asset was explicitly released as CC0 in september 2020."
+          Repository LICENSE.md: assets ("The base mesh and proxies", "Targets and modifiers")
+          "have been released under CC0 1.0 Universal."
+
+Attribution (not required under CC0, but appreciated):
+  "Human body model derived from the MakeHuman base mesh (CC0), makehumancommunity.org"
+
+Modifications: kept only the "body" group (helper/joint geometry removed); applied the
+young-male macro targets (equal 1/3 blend of the three ethnic targets, i.e. MakeHuman
+gender=1.0, age=25, average muscle/weight); triangulated; one iteration of Loop subdivision;
+exported with smooth vertex normals. No rescaling: units are MakeHuman decimetres.

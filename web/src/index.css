@@ -1,0 +1,79 @@
+/* Pathfinder: strictly greyscale. Garamond for reading, mono only for figures, a faint ordered-dither grain. */
+:root {
+  --black: #000000;
+  --panel: #0d0d0d;
+  --panel-2: #141414;
+  --line: #262626;
+  --line-2: #3a3a3a;
+  --white: #f2f2f2;
+  --grey: #9a9a9a;
+  --dim: #5f5f5f;
+  --serif: 'EB Garamond', Garamond, 'Times New Roman', serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* 4x4 Bayer-ordered dither, used as a barely-there grain on panels */
+  --dither: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Cg fill='%23fff'%3E%3Crect width='1' height='1'/%3E%3Crect x='2' y='2' width='1' height='1'/%3E%3Crect x='2' y='0' width='1' height='1' opacity='.5'/%3E%3Crect x='0' y='2' width='1' height='1' opacity='.5'/%3E%3C/g%3E%3C/svg%3E");
+  color-scheme: dark;
+
+  /* legacy names used across components, mapped to greyscale */
+  --room-1: #000;
+  --room-2: #000;
+  --sheet: var(--panel);
+  --sheet-line: var(--line);
+  --ink: var(--white);
+  --ink-2: var(--grey);
+  --ink-3: var(--dim);
+  --cobalt: var(--white);
+  --cobalt-ink: var(--black);
+  --amber: var(--white);
+  --good: var(--white);
+  --warn: var(--grey);
+  --bad: var(--white);
+  --block: var(--white);
+  --on-dark: var(--white);
+  --on-dark-2: var(--grey);
+  --font: var(--serif);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.4;
+  font-variant-numeric: lining-nums tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 1px solid var(--white);
+  outline-offset: 2px;
+}
+
+.num,
+.mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,0 +1,16 @@
+import { chromium } from 'playwright';
+const out = process.argv[2] ?? '.';
+const browser = await chromium.launch({ channel: 'msedge' });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+await page.goto('http://localhost:5173/', { waitUntil: 'load' });
+await page.waitForFunction(() => !document.querySelector('.loading'), null, { timeout: 120000 });
+await page.click('text=Find safest path');
+await page.waitForTimeout(1500);
+for (const l of ['Arteries', 'Veins', 'Lobes', 'Fissures', 'Ribs', 'Spine', 'Scapulae', 'Heart', 'Great vessels']) await page.click(`.layer:has-text("${l}")`);
+await page.click('text=X-ray skin');
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${out}/5-heat.png` });
+await page.keyboard.press('3');
+await page.waitForTimeout(1200);
+await page.screenshot({ path: `${out}/6-heat-side.png` });
+await browser.close();

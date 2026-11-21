@@ -1,0 +1,25 @@
+import { chromium } from 'playwright';
+const out = process.argv[2] ?? '.';
+const browser = await chromium.launch({ channel: 'msedge' });
+const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const logs = [];
+page.on('console', (m) => (m.type() === 'error' || m.type() === 'warning') && logs.push(`[${m.type()}] ${m.text()}`));
+page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
+await page.goto('http://localhost:5173/', { waitUntil: 'load' });
+await page.waitForFunction(() => !document.querySelector('.loading'), null, { timeout: 120000 });
+await page.waitForTimeout(1200);
+await page.screenshot({ path: `${out}/v2-1-start.png` });
+await page.keyboard.press('b');
+await page.waitForTimeout(1500);
+await page.screenshot({ path: `${out}/v2-2-body.png` });
+await page.keyboard.press('b');
+await page.waitForTimeout(1200);
+await page.mouse.move(700, 330); // aim at the front: should cross vessels / be blocked
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${out}/v2-3-aim-front.png` });
+await page.click('text=Find safest path');
+await page.waitForTimeout(1600);
+await page.screenshot({ path: `${out}/v2-4-plan.png` });
+console.log(JSON.stringify(await page.evaluate(() => window.__pf.viewer.proximity)));
+console.log(logs.slice(-10).join('\n'));
+await browser.close();
