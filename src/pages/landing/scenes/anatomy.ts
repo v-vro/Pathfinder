@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { DitherSceneSetup } from "../../../components/DitherCanvas";
+import { CandidatePaths } from "./candidatePaths";
 import { HeroControls } from "./heroControls";
 import {
   createGlowSprite,
@@ -377,14 +378,20 @@ export interface HeroSceneOptions {
   modelRotation?: Vec3;
 }
 
+/** Camera layer drawn undithered on top (candidate paths, target). */
+const OVERLAY_LAYER = 1;
+/** Where the candidate paths converge: inside the patient's right lung. */
+const PATH_TARGET = new THREE.Vector3(-0.52, 0.12, -0.04);
+
 /** Size of the anatomy the camera frames (scene units). */
 const FRAME_HEIGHT = 2.75; // includes a margin for perspective on the nearest ribs
 const FRAME_WIDTH = 2.4;
 const FRAME_CENTRE_Y = -0.02;
 
 /**
- * Landing hero: just the anatomy (ribs, spine, lungs), large and centred, driven by
- * mouse-follow, drag-to-spin, zoom and idle auto-rotate (see heroControls.ts).
+ * Landing hero: the anatomy (ribs, spine, lungs) in 1-bit dither, driven by mouse-follow,
+ * drag-to-spin, zoom and idle auto-rotate (heroControls.ts), with a decorative loop of
+ * risk-coloured candidate paths drawn crisp on top (candidatePaths.ts).
  */
 export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetup {
   const { models, modelRotation = [-Math.PI / 2, 0, 0] } = options;
@@ -399,12 +406,27 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
     scene.add(body);
 
     const procedural = new THREE.Group();
-    procedural.add(buildRibs().group, buildLung(-1), buildLung(1));
+    const { group: ribGroup, ribs } = buildRibs();
+    procedural.add(ribGroup, buildLung(-1), buildLung(1));
     body.add(procedural);
 
     const controls = new HeroControls(renderer.domElement, {
       reducedMotion,
       invalidate,
+    });
+
+    // Decorative candidate paths: crisp overlay layer + HTML labels over the canvas.
+    const labelLayer = document.createElement("div");
+    labelLayer.className = "lp-path-labels";
+    labelLayer.setAttribute("aria-hidden", "true");
+    renderer.domElement.parentElement?.appendChild(labelLayer);
+    const paths = new CandidatePaths({
+      parent: body,
+      ribs,
+      target: PATH_TARGET.clone(),
+      labelLayer,
+      layer: OVERLAY_LAYER,
+      reducedMotion,
     });
 
     let cancelled = false;
@@ -430,26 +452,35 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
     const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
 
     return {
-      update({ delta }) {
+      overlayLayer: OVERLAY_LAYER,
+      update({ delta, time }) {
         controls.update(delta);
         body.rotation.set(controls.pitch, controls.yaw, 0);
 
-        // Fit the anatomy to the canvas. Wide: ~80-85% of the height, centred.
-        // Narrow (phones): fit the width and sit in the upper part, above the hero text.
+        // Fit the anatomy to the canvas (~80% of its height, or most of its width if
+        // narrower), sitting a little right of centre.
         const narrow = camera.aspect < 0.9;
-        const fitHeight = FRAME_HEIGHT / ((narrow ? 0.6 : 0.82) * 2 * tanHalf);
-        const fitWidth = FRAME_WIDTH / (0.9 * 2 * tanHalf * camera.aspect);
+        const fitHeight = FRAME_HEIGHT / (0.78 * 2 * tanHalf);
+        // Narrow canvases leave side room for the path labels.
+        const fitWidth = FRAME_WIDTH / ((narrow ? 0.72 : 0.9) * 2 * tanHalf * camera.aspect);
         const distance = Math.max(fitHeight, fitWidth) / controls.zoom;
-        const visibleHeight = 2 * distance * tanHalf;
-        const y = FRAME_CENTRE_Y - (narrow ? 0.14 * visibleHeight : 0);
-        camera.position.set(0, y, distance);
-        camera.lookAt(0, y, 0);
+        const visibleWidth = 2 * distance * tanHalf * camera.aspect;
+        const x = narrow ? 0 : -0.06 * visibleWidth;
+        camera.position.set(x, FRAME_CENTRE_Y, distance);
+        camera.lookAt(x, FRAME_CENTRE_Y, 0);
+        camera.updateMatrixWorld();
         fog.near = distance - 0.1;
         fog.far = distance + 3.4;
+
+        body.updateMatrixWorld();
+        const el = renderer.domElement;
+        paths.update(delta, time, camera, el.clientWidth, el.clientHeight);
       },
       dispose() {
         cancelled = true;
         controls.dispose();
+        paths.dispose();
+        labelLayer.remove();
         disposeObject(scene);
         if (loadedRoot) disposeObject(loadedRoot);
       },

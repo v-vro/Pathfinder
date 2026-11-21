@@ -52,8 +52,15 @@ function Hero() {
     <section className="lp-hero" aria-labelledby="hero-title">
       <HeroAnatomy className="lp-hero__canvas" onFirstInteraction={hideHint} />
 
-      <div className="pf-container lp-hero__overlay">
+      <div className="lp-hero__inner">
         <div className="lp-hero__copy">
+          <img
+            src="/logo-on-dark.png"
+            alt="Pathfinder"
+            className="lp-hero__logo"
+            width={923}
+            height={184}
+          />
           <h1 id="hero-title" className="lp-hero__title">
             Find the safest path to the spot that&nbsp;matters.
           </h1>
@@ -69,9 +76,9 @@ function Hero() {
             </Button>
           </div>
         </div>
-        <p className="lp-hero__note pf-mono">Stylised model</p>
       </div>
 
+      <p className="lp-hero__note pf-mono">Stylised model · illustrative risks</p>
       <p
         className={["lp-hero__hint pf-mono", !hintVisible && "is-hidden"].filter(Boolean).join(" ")}
         aria-hidden="true"

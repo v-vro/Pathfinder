@@ -1,23 +1,8 @@
 import type { ReactNode } from "react";
+import { RISK_ICON_PATHS, RISK_WORD, type RiskLevel } from "./riskIcons";
 import "./components.css";
 
-export type RiskLevel = "safe" | "caution" | "danger";
-
-const TEXT: Record<RiskLevel, string> = { safe: "Safe", caution: "Caution", danger: "Danger" };
-
-const ICON: Record<RiskLevel, ReactNode> = {
-  // check
-  safe: <path d="M3.5 8.5l3 3 6-7" />,
-  // warning triangle with "!"
-  caution: (
-    <>
-      <path d="M8 2.2l6.2 11H1.8z" />
-      <path d="M8 6.5v3M8 11.4v.1" />
-    </>
-  ),
-  // cross
-  danger: <path d="M4 4l8 8M12 4l-8 8" />,
-};
+export type { RiskLevel };
 
 export interface RiskLabelProps {
   level: RiskLevel;
@@ -33,7 +18,7 @@ export interface RiskLabelProps {
  * never depends on telling red from green.
  */
 export function RiskLabel({ level, children, iconOnly, className }: RiskLabelProps) {
-  const text = children ?? TEXT[level];
+  const text = children ?? RISK_WORD[level];
   return (
     <span className={["pf-risk", `pf-risk--${level}`, className].filter(Boolean).join(" ")}>
       <svg
@@ -46,7 +31,9 @@ export function RiskLabel({ level, children, iconOnly, className }: RiskLabelPro
         strokeLinejoin="round"
         aria-hidden="true"
       >
-        {ICON[level]}
+        {RISK_ICON_PATHS[level].map((d) => (
+          <path key={d} d={d} />
+        ))}
       </svg>
       <span className={iconOnly ? "pf-visually-hidden" : undefined}>{text}</span>
     </span>

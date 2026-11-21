@@ -24,6 +24,13 @@ export interface DitherSceneContext {
 export interface DitherSceneHandle {
   update?: (frame: DitherFrame) => void;
   dispose?: () => void;
+  /**
+   * Objects on this camera layer (e.g. 1) are skipped by the dither pass and drawn
+   * afterwards at full resolution, undithered and antialiased, on top of everything.
+   * Use it for crisp colour overlays such as risk-coloured paths. Use unlit materials
+   * with `fog: false`.
+   */
+  overlayLayer?: number;
 }
 
 /**
@@ -151,7 +158,7 @@ export function DitherCanvas({
     try {
       renderer = new THREE.WebGLRenderer({
         canvas,
-        antialias: false,
+        antialias: true, // only affects the full-res passes (overlay edges)
         alpha: false,
         powerPreference: "high-performance",
       });
@@ -247,6 +254,14 @@ export function DitherCanvas({
       renderer.render(scene, camera);
       renderer.setRenderTarget(null);
       renderer.render(postScene, postCamera);
+      if (handle.overlayLayer !== undefined) {
+        camera.layers.set(handle.overlayLayer);
+        renderer.autoClear = false;
+        renderer.clearDepth();
+        renderer.render(scene, camera);
+        renderer.autoClear = true;
+        camera.layers.set(0);
+      }
     };
 
     const tick = (now: number) => {
