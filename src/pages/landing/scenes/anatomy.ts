@@ -6,6 +6,7 @@ import {
   createMarkerMaterial,
   ditherMarkerColor,
   disposeObject,
+  type DitherMarker,
 } from "../../../components/dither/markers";
 
 /**
@@ -22,7 +23,7 @@ export type Vec3 = [number, number, number];
 export interface AnatomySceneOptions {
   models?: AnatomyModels;
   /** Needle entry (on/outside skin) and target, in the same coordinate space as the models (mm). */
-  needle?: { entry: Vec3; target: Vec3 };
+  needle?: { entry: Vec3; target: Vec3; segments?: RiskSegment[] };
   /**
    * Rotation applied to loaded models before framing. Default turns CT patient space
    * (LPS: x left, y posterior, z superior) into three.js (y up, patient facing +z).
@@ -30,6 +31,8 @@ export interface AnatomySceneOptions {
   modelRotation?: Vec3;
   /** Framing preset. */
   view?: "hero" | "poster";
+  /** Colour the needle path with risk markers (hero only). Off = plain white path. */
+  riskPreview?: boolean;
 }
 
 const BODY_HEIGHT = 2.5;
@@ -42,7 +45,7 @@ function boneMaterial() {
 
 function lungMaterial(opacity = 0.72) {
   return new THREE.MeshStandardMaterial({
-    color: 0xc4c4c4,
+    color: 0x6e6e6e,
     roughness: 0.7,
     transparent: true,
     opacity,
@@ -164,58 +167,94 @@ function buildLung(side: number): THREE.Mesh {
 
 // ---------- Needle + target ----------
 
+/** A stretch of the needle path coloured by risk: from the previous segment's `to` up to this `to` (0..1). */
+export interface RiskSegment {
+  to: number;
+  risk: "safe" | "caution" | "danger";
+}
+
+/** Preview colouring: chest wall safe, pleural crossing caution, lung to target safe. */
+function defaultSegments(entryFrac: number): RiskSegment[] {
+  return [
+    { to: entryFrac, risk: "safe" },
+    { to: Math.min(entryFrac + 0.12, 0.95), risk: "caution" },
+    { to: 1, risk: "safe" },
+  ];
+}
+
 interface Needle {
   group: THREE.Group;
-  shaft: THREE.Mesh<THREE.TubeGeometry>;
+  segments: { mesh: THREE.Mesh<THREE.TubeGeometry>; from: number; to: number }[];
   lesion: THREE.Mesh;
   glow: THREE.Sprite;
   ring: THREE.Mesh;
 }
 
-function buildNeedle(start: THREE.Vector3, target: THREE.Vector3, lesionRadius = 0.065): Needle {
+function buildNeedle(
+  start: THREE.Vector3,
+  target: THREE.Vector3,
+  risk: { to: number; risk: DitherMarker }[],
+  lesionRadius = 0.065,
+): Needle {
   const group = new THREE.Group();
   const dir = target.clone().sub(start).normalize();
   const tip = target.clone().addScaledVector(dir, -lesionRadius * 0.9);
 
-  const shaft = new THREE.Mesh(
-    new THREE.TubeGeometry(new THREE.LineCurve3(start, tip), 64, 0.013, 6, false),
-    createMarkerMaterial("primary"),
-  );
-  group.add(onTop(shaft));
+  // Needle path, one tube per risk segment.
+  const segments: Needle["segments"] = [];
+  let from = 0;
+  for (const seg of risk) {
+    const to = THREE.MathUtils.clamp(seg.to, from, 1);
+    if (to - from < 1e-3) continue;
+    const a = start.clone().lerp(tip, from);
+    const b = start.clone().lerp(tip, to);
+    const tubular = Math.max(4, Math.round(64 * (to - from)));
+    const mesh = new THREE.Mesh(
+      new THREE.TubeGeometry(new THREE.LineCurve3(a, b), tubular, 0.014, 6, false),
+      createMarkerMaterial(seg.risk),
+    );
+    group.add(onTop(mesh));
+    segments.push({ mesh, from, to });
+    from = to;
+  }
 
   // Hub at the needle's outer end.
   const hub = new THREE.Mesh(
     new THREE.CylinderGeometry(0.034, 0.034, 0.04, 16),
-    createMarkerMaterial("primary"),
+    createMarkerMaterial("fg"),
   );
   hub.position.copy(start);
   hub.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
   group.add(onTop(hub));
 
-  // Entry ring on the chest wall.
+  // Entry ring where the path meets the chest wall.
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(0.07, 0.008, 6, 32),
-    createMarkerMaterial("primary", { intensity: 0.7 }),
+    createMarkerMaterial("fg", { intensity: 0.7 }),
   );
-  ring.position.copy(start.clone().lerp(tip, 0.42));
+  ring.position.copy(start.clone().lerp(tip, Math.max(0, (risk[0]?.to ?? 0.6) - 0.06)));
   ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
   group.add(onTop(ring));
 
   const lesion = new THREE.Mesh(
     new THREE.SphereGeometry(lesionRadius, 20, 14),
-    createMarkerMaterial("accent"),
+    createMarkerMaterial("fg"),
   );
   lesion.position.copy(target);
   group.add(onTop(lesion));
 
-  const glow = createGlowSprite("accent", lesionRadius * 9);
+  const glow = createGlowSprite("fg", lesionRadius * 9);
   glow.position.copy(target);
   group.add(onTop(glow));
 
-  return { group, shaft, lesion, glow, ring };
+  return { group, segments, lesion, glow, ring };
 }
 
-function proceduralNeedle(ribs: Rib[]): { start: THREE.Vector3; target: THREE.Vector3 } {
+function proceduralNeedle(ribs: Rib[]): {
+  start: THREE.Vector3;
+  entry: THREE.Vector3;
+  target: THREE.Vector3;
+} {
   // Patient's right side (three.js -x): enter between ribs 4 and 5, slightly anterior.
   const right = ribs.filter((r) => r.side < 0);
   const f = 0.62;
@@ -226,7 +265,7 @@ function proceduralNeedle(ribs: Rib[]): { start: THREE.Vector3; target: THREE.Ve
   const inward = centre.clone().sub(entry).normalize();
   const target = entry.clone().addScaledVector(inward, 0.36);
   const start = entry.clone().addScaledVector(inward, -0.62);
-  return { start, target };
+  return { start, entry, target };
 }
 
 // ---------- GLB loading ----------
@@ -241,7 +280,7 @@ function materialFor(role: string): THREE.Material {
     case "skin":
       return lungMaterial(0.12);
     case "lesion":
-      return createMarkerMaterial("accent");
+      return createMarkerMaterial("fg");
     default:
       return softMaterial();
   }
@@ -306,8 +345,8 @@ function backdrop(): THREE.Mesh {
   c.width = c.height = 128;
   const ctx = c.getContext("2d")!;
   const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  g.addColorStop(0, "rgb(40,40,40)");
-  g.addColorStop(0.55, "rgb(18,18,18)");
+  g.addColorStop(0, "rgb(12,12,12)");
+  g.addColorStop(0.55, "rgb(5,5,5)");
   g.addColorStop(1, "rgb(0,0,0)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 128, 128);
@@ -332,6 +371,7 @@ export function createAnatomyScene(options: AnatomySceneOptions = {}): DitherSce
     needle: needleOpt,
     modelRotation = [-Math.PI / 2, 0, 0],
     view = "hero",
+    riskPreview = true,
   } = options;
 
   return ({ scene, camera, reducedMotion, invalidate }) => {
@@ -364,13 +404,15 @@ export function createAnatomyScene(options: AnatomySceneOptions = {}): DitherSce
     body.add(procedural);
 
     const pn = proceduralNeedle(ribs);
-    let needle = buildNeedle(pn.start, pn.target);
+    const entryFrac = pn.start.distanceTo(pn.entry) / pn.start.distanceTo(pn.target);
+    const plain = [{ to: 1, risk: "fg" as const }];
+    let needle = buildNeedle(pn.start, pn.target, riskPreview ? defaultSegments(entryFrac) : plain);
     body.add(needle.group);
 
     // Slow scan ring sweeping along the body.
     const scanRing = new THREE.Mesh(
       new THREE.TorusGeometry(1.25, 0.006, 4, 96),
-      createMarkerMaterial("primary", { intensity: 0.45 }),
+      createMarkerMaterial("fg", { intensity: 0.45 }),
     );
     scanRing.rotation.x = Math.PI / 2;
     scanRing.scale.set(1, 0.72, 1);
@@ -406,7 +448,12 @@ export function createAnatomyScene(options: AnatomySceneOptions = {}): DitherSce
           body.remove(needle.group);
           disposeObject(needle.group);
           if (start && target) {
-            needle = buildNeedle(start, target, 0.05);
+            needle = buildNeedle(
+              start,
+              target,
+              riskPreview ? (needleOpt?.segments ?? defaultSegments(0.6)) : plain,
+              0.05,
+            );
             body.add(needle.group);
           }
           invalidate();
@@ -417,7 +464,6 @@ export function createAnatomyScene(options: AnatomySceneOptions = {}): DitherSce
     }
 
     const baseYaw = 0.55;
-    const indexCount = needle.shaft.geometry.index?.count ?? 0;
 
     return {
       update({ time, pointer }) {
@@ -435,8 +481,11 @@ export function createAnatomyScene(options: AnatomySceneOptions = {}): DitherSce
 
         // Needle draws in over the first seconds, then holds.
         const grow = THREE.MathUtils.smoothstep(time, 0.4, 2.6);
-        const count = needle.shaft.geometry.index?.count ?? indexCount;
-        needle.shaft.geometry.setDrawRange(0, Math.max(0, Math.floor((count * grow) / 6) * 6));
+        for (const seg of needle.segments) {
+          const local = THREE.MathUtils.clamp((grow - seg.from) / (seg.to - seg.from), 0, 1);
+          const count = seg.mesh.geometry.index?.count ?? 0;
+          seg.mesh.geometry.setDrawRange(0, Math.floor((count * local) / 6) * 6);
+        }
 
         const pulse = 0.5 + 0.5 * Math.sin(time * 3);
         const arrived = THREE.MathUtils.smoothstep(time, 2.2, 2.8);
@@ -444,7 +493,7 @@ export function createAnatomyScene(options: AnatomySceneOptions = {}): DitherSce
         const glowMat = needle.glow.material as THREE.SpriteMaterial;
         glowMat.opacity = (0.35 + pulse * 0.65) * (0.4 + 0.6 * arrived);
         (needle.ring.material as THREE.MeshBasicMaterial).color.copy(
-          ditherMarkerColor("primary", 0.4 + 0.5 * arrived),
+          ditherMarkerColor("fg", 0.4 + 0.5 * arrived),
         );
 
         scanRing.position.y = Math.sin(time * 0.35) * 1.1;

@@ -339,6 +339,7 @@
 .pf-logo {
   width: auto;
   max-width: none;
+  filter: var(--logo-filter);
 }
 
 .pf-nav__links {
@@ -554,4 +555,35 @@
 
 .pf-dither--fallback .pf-dither__canvas {
   display: none;
+}
+
+/* ================= RiskLabel ================= */
+
+.pf-risk {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-mono);
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.pf-risk__icon {
+  flex: none;
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.pf-risk--safe {
+  color: var(--risk-safe);
+}
+
+.pf-risk--caution {
+  color: var(--risk-caution);
+}
+
+.pf-risk--danger {
+  color: var(--risk-danger);
 }

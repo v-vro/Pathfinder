@@ -6,9 +6,9 @@
  * out which cell each fragment belongs to, and quantises that cell's luminance into the
  * palette using a Bayer threshold. Cells are square in device pixels at any DPR.
  *
- * Marker colours: pixels whose colour is strongly green-dominant are drawn in the
- * `fg` colour, and strongly red-dominant pixels in the `accent` colour, regardless of
- * luminance. Use `ditherMarkerColor` from ./markers to get those colours.
+ * Risk markers: strongly saturated pixels are drawn in a risk colour instead of being
+ * dithered by luminance. Green -> uSafe, yellow -> uCaution, red -> uDanger. Use
+ * `ditherMarkerColor` from ./markers to get those colours. Everything else is greyscale.
  */
 
 export const ditherVertexShader = /* glsl */ `
@@ -23,14 +23,16 @@ export const ditherFragmentShader = /* glsl */ `
   uniform sampler2D tScene;
   uniform vec2 uCells;        // number of dither cells across / down
   uniform float uCellSize;    // cell size in device pixels
-  uniform float uLevels;      // 2 or 3 palette levels for ordinary shading
+  uniform float uLevels;      // 2 (1-bit) or 3 palette levels
   uniform float uMatrix;      // 4 or 8 (Bayer matrix size)
   uniform float uContrast;
   uniform float uBrightness;
   uniform vec3 uBg;
   uniform vec3 uMid;
   uniform vec3 uFg;
-  uniform vec3 uAccent;
+  uniform vec3 uSafe;
+  uniform vec3 uCaution;
+  uniform vec3 uDanger;
 
   float bayer2(vec2 a) {
     a = floor(a);
@@ -48,17 +50,15 @@ export const ditherFragmentShader = /* glsl */ `
     float n = uMatrix > 6.0 ? 64.0 : 16.0;
     float t = (uMatrix > 6.0 ? bayer8(cell) : bayer4(cell)) + 0.5 / n;
 
-    // Marker channels (linear colour).
-    float primaryMark = c.g - max(c.r, c.b);
-    float accentMark = c.r - max(c.g, c.b);
+    float hi = max(c.r, max(c.g, c.b));
+    float chroma = hi - min(c.r, min(c.g, c.b));
 
     vec3 color;
-    if (accentMark > 0.12) {
-      float v = clamp(accentMark * 1.6, 0.0, 1.0);
-      color = v > t ? uAccent : uBg;
-    } else if (primaryMark > 0.12) {
-      float v = clamp(primaryMark * 1.6, 0.0, 1.0);
-      color = v > t ? uFg : uBg;
+    if (chroma > 0.12) {
+      // Risk marker: pick the colour by hue, dither its strength.
+      vec3 risk = (c.r > 0.5 * hi && c.g > 0.5 * hi) ? uCaution : (c.r > c.g ? uDanger : uSafe);
+      float v = clamp(chroma * 1.6, 0.0, 1.0);
+      color = v > t ? risk : uBg;
     } else {
       // Perceptual luminance from linear RGB.
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));

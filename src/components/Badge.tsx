@@ -2,7 +2,7 @@ import type { HTMLAttributes, ReactNode } from "react";
 import "./components.css";
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  /** neutral: info. primary: teal, positive / safe. accent: amber, target or highlight only. */
+  /** neutral: info. primary / accent: emphasised (white). Not for risk: use <RiskLabel>. */
   tone?: "neutral" | "primary" | "accent";
   /** Show a small status dot before the text. */
   dot?: boolean;

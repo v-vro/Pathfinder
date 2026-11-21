@@ -8,54 +8,67 @@
 @import "@fontsource-variable/jetbrains-mono";
 
 :root {
-  /* ---------- Raw palette (use the semantic tokens below in components) ---------- */
-  --pf-navy-950: #03060f; /* deepest: footer, insets */
-  --pf-navy-900: #050a18; /* page background (near-black navy) */
-  --pf-navy-800: #0b1426; /* surface */
-  --pf-navy-700: #111c33; /* raised surface */
-  --pf-navy-600: #1a2640; /* borders */
-  --pf-navy-500: #24324f; /* strong borders */
-  --pf-teal-500: #2ccdb4; /* primary */
-  --pf-teal-400: #62e0cc; /* primary hover */
-  --pf-amber-500: #f5b03c; /* accent: targets, highlights, main CTA only */
-  --pf-amber-400: #ffc463; /* accent hover */
-  --pf-white: #eaf0f7; /* off-white text */
-  --pf-grey-blue: #9aabc7; /* muted text */
+  /* ---------- Raw palette: greyscale only (use the semantic tokens below) ---------- */
+  --pf-black: #000000; /* page background */
+  --pf-grey-950: #0a0a0a; /* surface */
+  --pf-grey-900: #141414; /* raised surface */
+  --pf-grey-850: #1a1a1a; /* hovered surface */
+  --pf-grey-800: #262626; /* borders */
+  --pf-grey-700: #404040; /* strong borders */
+  --pf-grey-600: #5c5c5c; /* disabled text and icons */
+  --pf-grey-500: #8a8a8a; /* muted text */
+  --pf-grey-200: #d4d4d4; /* hover on white fills */
+  --pf-white: #ffffff; /* text, primary actions */
+
+  /* ---------- Risk markers: the ONLY colours. Meaning only, never decoration. ---------- */
+  /* Reserved for the planner's 3D view: path segments, skin safe-zone map, target, risk breakdown. */
+  /* Always pair with an icon or word (<RiskLabel>). */
+  --risk-safe: #22c55e;
+  --risk-caution: #eab308;
+  --risk-danger: #ef4444;
 
   /* ---------- Semantic colours ---------- */
-  --color-bg: var(--pf-navy-900);
-  --color-bg-deep: var(--pf-navy-950);
-  --color-surface: var(--pf-navy-800);
-  --color-surface-raised: var(--pf-navy-700);
-  --color-border: var(--pf-navy-600);
-  --color-border-strong: var(--pf-navy-500);
+  --color-bg: var(--pf-black);
+  --color-bg-deep: var(--pf-black);
+  --color-surface: var(--pf-grey-950);
+  --color-surface-raised: var(--pf-grey-900);
+  --color-surface-hover: var(--pf-grey-850);
+  --color-border: var(--pf-grey-800);
+  --color-border-strong: var(--pf-grey-700);
 
-  --color-primary: var(--pf-teal-500);
-  --color-primary-hover: var(--pf-teal-400);
-  --color-primary-soft: color-mix(in srgb, var(--pf-teal-500) 14%, transparent);
-  --color-primary-border: color-mix(in srgb, var(--pf-teal-500) 45%, transparent);
-  --color-on-primary: var(--pf-navy-900);
+  /* "primary": links, outlines, active states. White. */
+  --color-primary: var(--pf-white);
+  --color-primary-hover: var(--pf-grey-200);
+  --color-primary-soft: color-mix(in srgb, var(--pf-white) 8%, transparent);
+  --color-primary-border: var(--pf-white);
+  --color-on-primary: var(--pf-black);
 
-  --color-accent: var(--pf-amber-500);
-  --color-accent-hover: var(--pf-amber-400);
-  --color-accent-soft: color-mix(in srgb, var(--pf-amber-500) 14%, transparent);
-  --color-accent-border: color-mix(in srgb, var(--pf-amber-500) 40%, transparent);
-  --color-on-accent: var(--pf-navy-900);
+  /* "accent": the single main call to action and highlights. White fill, black text. */
+  --color-accent: var(--pf-white);
+  --color-accent-hover: var(--pf-grey-200);
+  --color-accent-soft: color-mix(in srgb, var(--pf-white) 8%, transparent);
+  --color-accent-border: color-mix(in srgb, var(--pf-white) 40%, transparent);
+  --color-on-accent: var(--pf-black);
 
   --color-text: var(--pf-white);
-  --color-text-muted: var(--pf-grey-blue);
-  --color-focus: var(--pf-amber-500);
+  --color-text-muted: var(--pf-grey-500);
+  --color-text-disabled: var(--pf-grey-600);
+  --color-focus: var(--pf-white);
 
   /* Translucent backgrounds, derived from the palette above */
-  --color-bg-translucent: color-mix(in srgb, var(--pf-navy-900) 80%, transparent); /* sticky nav */
-  --color-scrim: color-mix(in srgb, var(--pf-navy-950) 55%, transparent); /* soft overlay */
-  --color-scrim-strong: color-mix(in srgb, var(--pf-navy-950) 85%, transparent); /* label backing */
+  --color-bg-translucent: color-mix(in srgb, var(--pf-black) 80%, transparent); /* sticky nav */
+  --color-scrim: color-mix(in srgb, var(--pf-black) 55%, transparent); /* soft overlay */
+  --color-scrim-strong: color-mix(in srgb, var(--pf-black) 85%, transparent); /* label backing */
 
-  /* Dither palette: read by <DitherCanvas> at runtime. bg must equal --color-bg. */
-  --dither-bg: var(--pf-navy-900);
-  --dither-mid: var(--pf-navy-600);
-  --dither-fg: var(--pf-teal-500);
-  --dither-accent: var(--pf-amber-500);
+  /* Dither: 1-bit black and white, read by <DitherCanvas> at runtime. bg must equal --color-bg. */
+  /* Risk markers in dithered scenes use the --risk-* tokens. */
+  --dither-bg: var(--pf-black);
+  --dither-mid: var(--pf-grey-700); /* only used if a canvas opts into levels={3} */
+  --dither-fg: var(--pf-white);
+  --dither-levels: 2;
+
+  /* Logo: forces the current colour logo to pure white. Set to "none" for a monochrome export. */
+  --logo-filter: brightness(0) invert(1);
 
   /* ---------- Typography ---------- */
   --font-sans: "Manrope Variable", "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -109,12 +122,10 @@
   --shadow-md: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-lg: 0 10px 24px -14px rgb(0 0 0 / 0.8);
   --shadow-inset: inset 0 1px 2px rgb(0 0 0 / 0.5);
-  --shadow-glow-primary:
-    0 0 0 1px var(--color-primary-border),
-    0 6px 24px -8px color-mix(in srgb, var(--pf-teal-500) 40%, transparent);
+  --shadow-glow-primary: 0 0 0 1px var(--color-primary-border);
   --shadow-glow-accent:
     0 0 0 1px var(--color-accent-border),
-    0 6px 24px -8px color-mix(in srgb, var(--pf-amber-500) 45%, transparent);
+    0 6px 24px -10px color-mix(in srgb, var(--pf-white) 25%, transparent);
 
   /* ---------- Motion ---------- */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);

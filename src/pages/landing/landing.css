@@ -50,6 +50,7 @@
 .lp-hero__logo {
   width: clamp(200px, 26vw, 320px);
   height: auto;
+  filter: var(--logo-filter);
   margin-bottom: var(--space-2);
 }
 
@@ -122,6 +123,10 @@
   top: 0;
   right: 0;
 }
+
+.lp-hud > .lp-hud__tr {
+  gap: var(--space-3);
+}
 .lp-hud__bl {
   bottom: 0;
   left: 0;
@@ -135,10 +140,6 @@
   display: inline-block;
   width: 8px;
   height: 8px;
-}
-
-.lp-hud__swatch--primary {
-  background: var(--color-primary);
 }
 
 .lp-hud__swatch--accent {

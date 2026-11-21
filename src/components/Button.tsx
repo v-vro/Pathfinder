@@ -7,8 +7,8 @@ export type ButtonSize = "sm" | "md" | "lg";
 
 interface BaseProps {
   /**
-   * primary: amber, the single main call to action on a view.
-   * secondary: teal, normal actions.
+   * primary: white fill, black text. The single main call to action on a view.
+   * secondary: white outline, normal actions.
    * ghost: low-emphasis text button.
    */
   variant?: ButtonVariant;

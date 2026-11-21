@@ -4,6 +4,7 @@ import { Button } from "../../components/Button";
 import { DitherCanvas, type DitherSceneSetup } from "../../components/DitherCanvas";
 import { Panel } from "../../components/Panel";
 import { Reveal } from "../../components/Reveal";
+import { RiskLabel } from "../../components/RiskLabel";
 import { SectionHeader } from "../../components/SectionHeader";
 import { HeroAnatomy } from "./HeroAnatomy";
 import {
@@ -83,13 +84,14 @@ function Hero() {
           <HeroAnatomy className="lp-hero__canvas" />
           <div className="lp-hud" aria-hidden="true">
             <span className="lp-hud__tl pf-mono">Chest CT · 3D</span>
-            <span className="lp-hud__tr pf-mono">
-              <i className="lp-hud__swatch lp-hud__swatch--primary" /> Safest path
+            <span className="lp-hud__tr">
+              <RiskLabel level="safe" />
+              <RiskLabel level="caution" />
             </span>
             <span className="lp-hud__br pf-mono">
               <i className="lp-hud__swatch lp-hud__swatch--accent" /> Target
             </span>
-            <span className="lp-hud__bl pf-mono">Stylised model</span>
+            <span className="lp-hud__bl pf-mono">Stylised model · risk preview</span>
           </div>
         </div>
       </div>
@@ -174,13 +176,13 @@ const STEPS: { title: string; body: string; scene: DitherSceneSetup; alt: string
     title: "Aim and see the risk",
     body: "Aim the needle with your hand. Each route is scored as you move, and the score tells you why: lung crossed, angle, fissures, emphysema, vessels.",
     scene: aimScene,
-    alt: "A needle sweeps toward an amber target and dims when its path would hit a rib.",
+    alt: "A needle sweeps toward a target and dims when its path would hit a rib.",
   },
   {
     title: "Safest path, explained",
     body: "One click searches the skin for the lowest-risk route, then Gemini writes a plan for the doctor and a plain-language explanation for the patient.",
     scene: pathScene,
-    alt: "Candidate routes to an amber target are tried one by one and the safest lights up.",
+    alt: "Candidate routes to a target are tried one by one and the safest lights up.",
   },
 ];
 
@@ -320,6 +322,7 @@ function Demo() {
               <>
                 <HeroAnatomy
                   view="poster"
+                  riskPreview={false}
                   pixelSize={4}
                   className="lp-demo__poster"
                   label="Demo video poster"

@@ -1,22 +1,36 @@
 import * as THREE from "three";
 
 /**
- * Colours that <DitherCanvas> treats as "draw me in a palette colour" instead of
- * dithering by brightness. Use them on unlit (MeshBasic / LineBasic) materials.
+ * Marker kinds for <DitherCanvas> scenes.
  *
- * - "primary": drawn in the dither fg colour (teal). Needles, paths, scan planes.
- * - "accent":  drawn in the dither accent colour (amber). Targets and lesions only.
- *
- * Scale the colour (e.g. `.multiplyScalar(0.5)`) to fade a marker; the shader dithers
- * the fade.
+ * - "fg":      solid foreground (white). Needles, targets, scan planes, highlights.
+ *              Plain luminance, so it fades through the 1-bit dither like everything else.
+ * - "safe" | "caution" | "danger": drawn in the matching --risk-* colour instead of being
+ *              dithered to black/white. Risk colours are reserved for risk meaning only
+ *              (see THEME.md); always pair them with a text or icon label (<RiskLabel>).
  */
-export function ditherMarkerColor(kind: "primary" | "accent", intensity = 1): THREE.Color {
-  const c = kind === "primary" ? new THREE.Color(0, 1, 0) : new THREE.Color(1, 0, 0);
-  return c.multiplyScalar(intensity);
+export type DitherMarker = "fg" | "safe" | "caution" | "danger";
+
+/**
+ * Colour to put on an unlit material so the dither pass draws it as `kind`.
+ * `intensity` (0..1) is roughly the share of the dither cells that light up.
+ */
+export function ditherMarkerColor(kind: DitherMarker, intensity = 1): THREE.Color {
+  switch (kind) {
+    case "safe":
+      return new THREE.Color(0, 1, 0).multiplyScalar(intensity);
+    case "caution":
+      return new THREE.Color(1, 1, 0).multiplyScalar(intensity);
+    case "danger":
+      return new THREE.Color(1, 0, 0).multiplyScalar(intensity);
+    default:
+      // The shader works in perceptual space, so undo the gamma to keep `intensity` linear-ish.
+      return new THREE.Color(1, 1, 1).multiplyScalar(Math.pow(intensity, 2.2));
+  }
 }
 
 export function createMarkerMaterial(
-  kind: "primary" | "accent",
+  kind: DitherMarker,
   opts: { intensity?: number; transparent?: boolean } = {},
 ): THREE.MeshBasicMaterial {
   return new THREE.MeshBasicMaterial({
@@ -27,12 +41,19 @@ export function createMarkerMaterial(
 }
 
 /** Soft radial glow sprite in a marker colour (additive). */
-export function createGlowSprite(kind: "primary" | "accent", size = 1): THREE.Sprite {
+export function createGlowSprite(kind: DitherMarker, size = 1): THREE.Sprite {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 64;
   const ctx = canvas.getContext("2d")!;
   const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  const rgb = kind === "primary" ? "0,255,0" : "255,0,0";
+  const rgb =
+    kind === "safe"
+      ? "0,255,0"
+      : kind === "caution"
+        ? "255,255,0"
+        : kind === "danger"
+          ? "255,0,0"
+          : "255,255,255";
   g.addColorStop(0, `rgba(${rgb},1)`);
   g.addColorStop(0.35, `rgba(${rgb},0.45)`);
   g.addColorStop(1, `rgba(${rgb},0)`);

@@ -12,6 +12,8 @@ export interface HeroAnatomyProps {
   needle?: { entry: Vec3; target: Vec3 };
   pixelSize?: number;
   view?: "hero" | "poster";
+  /** Colour the needle path with the risk markers. Only the hero shows this preview. */
+  riskPreview?: boolean;
   className?: string;
   label?: string;
 }
@@ -22,11 +24,12 @@ export function HeroAnatomy({
   needle,
   pixelSize = 3,
   view = "hero",
+  riskPreview = true,
   className,
-  label = "Stylised 3D ribcage and lungs. A teal needle path enters between two ribs and ends at a pulsing amber target.",
+  label = "Stylised 3D ribcage and lungs. A needle path enters between two ribs and ends at a pulsing target. The path is marked safe through the chest wall, caution where it crosses the lung surface, then safe to the target.",
 }: HeroAnatomyProps) {
   // Rebuild the scene only when the inputs actually change.
-  const key = JSON.stringify({ models, needle, view });
+  const key = JSON.stringify({ models, needle, view, riskPreview });
   const setup = useMemo(
     () => createAnatomyScene(JSON.parse(key) as Parameters<typeof createAnatomyScene>[0]),
     [key],

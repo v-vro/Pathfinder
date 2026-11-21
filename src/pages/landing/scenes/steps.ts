@@ -58,7 +58,7 @@ export const scanScene: DitherSceneSetup = ({ scene, camera, reducedMotion }) =>
   const plane = new THREE.Mesh(
     planeGeo,
     new THREE.MeshBasicMaterial({
-      color: ditherMarkerColor("primary", 0.14),
+      color: ditherMarkerColor("fg", 0.14),
       side: THREE.DoubleSide,
       transparent: true,
       depthWrite: false,
@@ -69,12 +69,12 @@ export const scanScene: DitherSceneSetup = ({ scene, camera, reducedMotion }) =>
   plane.renderOrder = 2;
   const edge = new THREE.LineSegments(
     new THREE.EdgesGeometry(planeGeo),
-    new THREE.LineBasicMaterial({ color: ditherMarkerColor("primary"), fog: false }),
+    new THREE.LineBasicMaterial({ color: ditherMarkerColor("fg"), fog: false }),
   );
   edge.rotation.x = -Math.PI / 2;
   group.add(plane, edge);
 
-  const primary = ditherMarkerColor("primary");
+  const primary = ditherMarkerColor("fg");
 
   return {
     update({ time }) {
@@ -119,7 +119,7 @@ export const aimScene: DitherSceneSetup = ({ scene, camera, reducedMotion }) => 
   const lung = new THREE.Mesh(
     new THREE.SphereGeometry(1, 40, 28),
     new THREE.MeshStandardMaterial({
-      color: 0x8a8a8a,
+      color: 0x5a5a5a,
       roughness: 0.7,
       transparent: true,
       opacity: 0.55,
@@ -138,17 +138,17 @@ export const aimScene: DitherSceneSetup = ({ scene, camera, reducedMotion }) => 
   const target = new THREE.Vector3(0.05, -0.05, -0.35);
   const lesion = new THREE.Mesh(
     new THREE.SphereGeometry(0.1, 20, 14),
-    createMarkerMaterial("accent", { transparent: true }),
+    createMarkerMaterial("fg", { transparent: true }),
   );
   lesion.position.copy(target);
   lesion.renderOrder = 2;
-  const glow = createGlowSprite("accent", 0.8);
+  const glow = createGlowSprite("fg", 0.8);
   glow.position.copy(target);
   glow.renderOrder = 2;
   group.add(lesion, glow);
 
   const needleLen = 1.9;
-  const needleMat = createMarkerMaterial("primary", { transparent: true });
+  const needleMat = createMarkerMaterial("fg", { transparent: true });
   const needle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, needleLen, 8), needleMat);
   needle.geometry.translate(0, needleLen / 2 + 0.1, 0);
   needle.renderOrder = 2;
@@ -170,7 +170,7 @@ export const aimScene: DitherSceneSetup = ({ scene, camera, reducedMotion }) => 
       tmp.copy(target).addScaledVector(dir, t);
       const nearest = Math.min(...ribYs.map((y) => Math.abs(tmp.y - y)));
       const blocked = THREE.MathUtils.smoothstep(0.22 - nearest, 0, 0.1);
-      needleMat.color.copy(ditherMarkerColor("primary", 1 - blocked * 0.75));
+      needleMat.color.copy(ditherMarkerColor("fg", 1 - blocked * 0.75));
 
       const pulse = 0.5 + 0.5 * Math.sin(time * 3);
       (glow.material as THREE.SpriteMaterial).opacity = reducedMotion ? 0.8 : 0.4 + pulse * 0.6;
@@ -191,16 +191,16 @@ export const pathScene: DitherSceneSetup = ({ scene, camera, reducedMotion }) =>
 
   const shell = new THREE.Mesh(
     new THREE.SphereGeometry(1.35, 24, 16),
-    new THREE.MeshBasicMaterial({ color: 0x2a2a2a, wireframe: true }),
+    new THREE.MeshBasicMaterial({ color: 0x161616, wireframe: true }),
   );
   group.add(shell);
 
   const lesion = new THREE.Mesh(
     new THREE.SphereGeometry(0.12, 20, 14),
-    createMarkerMaterial("accent", { transparent: true }),
+    createMarkerMaterial("fg", { transparent: true }),
   );
   lesion.renderOrder = 2;
-  const glow = createGlowSprite("accent", 0.9);
+  const glow = createGlowSprite("fg", 0.9);
   glow.renderOrder = 2;
   group.add(lesion, glow);
 
@@ -231,7 +231,7 @@ export const pathScene: DitherSceneSetup = ({ scene, camera, reducedMotion }) =>
 
   const grey = new THREE.Color(0x6a6a6a);
   const dim = new THREE.Color(0x303030);
-  const on = ditherMarkerColor("primary");
+  const on = ditherMarkerColor("fg");
 
   return {
     update({ time }) {

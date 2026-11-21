@@ -37,14 +37,17 @@ export interface DitherPalette {
   bg?: string;
   mid?: string;
   fg?: string;
-  accent?: string;
+  /** Risk marker colours. Only for risk meaning; see THEME.md. */
+  safe?: string;
+  caution?: string;
+  danger?: string;
 }
 
 export interface DitherCanvasProps {
   setup: DitherSceneSetup;
   /** Dither cell size in CSS pixels. Multiplied by devicePixelRatio and rounded. */
   pixelSize?: number;
-  /** 2 = bg/fg only, 3 = bg/mid/fg. */
+  /** 2 = 1-bit bg/fg, 3 = bg/mid/fg. Defaults to the --dither-levels token. */
   levels?: 2 | 3;
   /** Bayer matrix size. */
   matrix?: 4 | 8;
@@ -63,7 +66,9 @@ const DEFAULT_PALETTE: Required<DitherPalette> = {
   bg: "--dither-bg",
   mid: "--dither-mid",
   fg: "--dither-fg",
-  accent: "--dither-accent",
+  safe: "--risk-safe",
+  caution: "--risk-caution",
+  danger: "--risk-danger",
 };
 
 let probe: CanvasRenderingContext2D | null = null;
@@ -116,7 +121,7 @@ interface Internals {
 export function DitherCanvas({
   setup,
   pixelSize = 3,
-  levels = 3,
+  levels,
   matrix = 8,
   palette,
   contrast = 1,
@@ -184,7 +189,9 @@ export function DitherCanvas({
         uBg: { value: new THREE.Vector3() },
         uMid: { value: new THREE.Vector3() },
         uFg: { value: new THREE.Vector3() },
-        uAccent: { value: new THREE.Vector3() },
+        uSafe: { value: new THREE.Vector3() },
+        uCaution: { value: new THREE.Vector3() },
+        uDanger: { value: new THREE.Vector3() },
       },
     });
     const postScene = new THREE.Scene();
@@ -339,8 +346,11 @@ export function DitherCanvas({
     u.uBg.value.copy(resolveColor(host, p.bg));
     u.uMid.value.copy(resolveColor(host, p.mid));
     u.uFg.value.copy(resolveColor(host, p.fg));
-    u.uAccent.value.copy(resolveColor(host, p.accent));
-    u.uLevels.value = levels;
+    u.uSafe.value.copy(resolveColor(host, p.safe));
+    u.uCaution.value.copy(resolveColor(host, p.caution));
+    u.uDanger.value.copy(resolveColor(host, p.danger));
+    const tokenLevels = Number(getComputedStyle(host).getPropertyValue("--dither-levels")) || 3;
+    u.uLevels.value = levels ?? (tokenLevels <= 2 ? 2 : 3);
     u.uMatrix.value = matrix;
     u.uContrast.value = contrast;
     u.uBrightness.value = brightness;
