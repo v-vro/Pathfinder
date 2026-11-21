@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { DitherSceneSetup } from "../../../components/DitherCanvas";
-import { CandidatePaths } from "./candidatePaths";
+import { NeedleSearch } from "./needleSearch";
 import { HeroControls } from "./heroControls";
 import {
   createGlowSprite,
@@ -363,14 +363,19 @@ function backdrop(): THREE.Mesh {
   return mesh;
 }
 
-function addLights(scene: THREE.Scene) {
-  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-  const key = new THREE.DirectionalLight(0xffffff, 2.4);
-  key.position.set(-2.5, 3, 4);
-  scene.add(key);
-  const rim = new THREE.DirectionalLight(0xffffff, 1.6);
-  rim.position.set(3, 1, -4);
-  scene.add(rim);
+/** Key, rim and ambient light. `alsoLayers` makes them light overlay layers too. */
+function addLights(scene: THREE.Scene, alsoLayers: number[] = []) {
+  const lights = [
+    new THREE.AmbientLight(0xffffff, 0.35),
+    new THREE.DirectionalLight(0xffffff, 2.4),
+    new THREE.DirectionalLight(0xffffff, 1.6),
+  ];
+  lights[1].position.set(-2.5, 3, 4);
+  lights[2].position.set(3, 1, -4);
+  for (const light of lights) {
+    for (const layer of alsoLayers) light.layers.enable(layer);
+    scene.add(light);
+  }
 }
 
 export interface HeroSceneOptions {
@@ -380,7 +385,7 @@ export interface HeroSceneOptions {
 
 /** Camera layer drawn undithered on top (candidate paths, target). */
 const OVERLAY_LAYER = 1;
-/** Where the candidate paths converge: inside the patient's right lung. */
+/** The needle's target: inside the patient's right lung. */
 const PATH_TARGET = new THREE.Vector3(-0.52, 0.12, -0.04);
 
 /** Size of the anatomy the camera frames (scene units). */
@@ -390,8 +395,8 @@ const FRAME_CENTRE_Y = -0.02;
 
 /**
  * Landing hero: the anatomy (ribs, spine, lungs) in 1-bit dither, driven by mouse-follow,
- * drag-to-spin, zoom and idle auto-rotate (heroControls.ts), with a decorative loop of
- * risk-coloured candidate paths drawn crisp on top (candidatePaths.ts).
+ * drag-to-spin, zoom and idle auto-rotate (heroControls.ts), with a decorative needle
+ * search drawn crisp on top (needleSearch.ts).
  */
 export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetup {
   const { models, modelRotation = [-Math.PI / 2, 0, 0] } = options;
@@ -400,7 +405,7 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
     const fog = new THREE.Fog(0x000000, 5, 8.5);
     scene.fog = fog;
     scene.add(backdrop());
-    addLights(scene);
+    addLights(scene, [OVERLAY_LAYER]); // the needle is lit on the overlay layer
 
     const body = new THREE.Group();
     scene.add(body);
@@ -415,12 +420,12 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
       invalidate,
     });
 
-    // Decorative candidate paths: crisp overlay layer + HTML labels over the canvas.
+    // Decorative needle search: crisp overlay layer + HTML labels over the canvas.
     const labelLayer = document.createElement("div");
     labelLayer.className = "lp-path-labels";
     labelLayer.setAttribute("aria-hidden", "true");
     renderer.domElement.parentElement?.appendChild(labelLayer);
-    const paths = new CandidatePaths({
+    const needle = new NeedleSearch({
       parent: body,
       ribs,
       target: PATH_TARGET.clone(),
@@ -453,7 +458,7 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
 
     return {
       overlayLayer: OVERLAY_LAYER,
-      update({ delta, time }) {
+      update({ delta }) {
         controls.update(delta);
         body.rotation.set(controls.pitch, controls.yaw, 0);
 
@@ -474,12 +479,12 @@ export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetu
 
         body.updateMatrixWorld();
         const el = renderer.domElement;
-        paths.update(delta, time, camera, el.clientWidth, el.clientHeight);
+        needle.update(delta, camera, el.clientWidth, el.clientHeight);
       },
       dispose() {
         cancelled = true;
         controls.dispose();
-        paths.dispose();
+        needle.dispose();
         labelLayer.remove();
         disposeObject(scene);
         if (loadedRoot) disposeObject(loadedRoot);

@@ -26,7 +26,7 @@ const MAX_PITCH = 70 * DEG;
 const ZOOM_MIN = 1;
 const ZOOM_MAX = 1.35;
 const IDLE_MS = 4000;
-const AUTO_ROTATE_SPEED = 0.28; // rad/s
+const AUTO_ROTATE_SPEED = 0.18; // rad/s, slow enough to follow a needle attempt
 const BASE_YAW = 0.35;
 const BASE_PITCH = 0.06;
 
