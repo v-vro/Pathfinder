@@ -7,7 +7,7 @@ The design system for every Pathfinder screen: the landing page, `/planner`, `/h
 1. **All UI uses the variables in `src/theme.css` and the components in `src/components/`.** Don't hard-code hex values, font names, pixel spacing or shadows.
 2. **No new colours or fonts.** If something seems to need one, ask Ibrahim first. Don't add it in place.
 3. **Strictly black and white.** The whole UI is greyscale: black background, near-black panels, white text and actions. The only colours anywhere are the three risk markers.
-4. **Risk colours mean risk, nothing else.** `--risk-safe`, `--risk-caution` and `--risk-danger` are reserved for the planner's 3D view: needle path segments, the skin safe-zone map, the target, and the risk breakdown. Never use them for regular UI (buttons, links, badges, focus, decoration). The only exception is the landing hero, which shows one path coloured with them as a preview.
+4. **Risk colours mean risk, nothing else.** `--risk-safe`, `--risk-caution` and `--risk-danger` are reserved for the planner's 3D view: needle path segments, the skin safe-zone map, the target, and the risk breakdown. Never use them for regular UI (buttons, links, badges, focus, decoration). On the landing page they don't appear at all; the hero is anatomy only.
 5. **Never colour alone.** Red and green look alike to many colour-blind people, so wherever a risk colour appears, also show a word or icon: "Safe" ✓, "Caution" ⚠, "Danger" ✕. Use `<RiskLabel>`.
 6. **Respect reduced motion.** Duration tokens drop to `0ms` under `prefers-reduced-motion`; use them instead of literal durations. `DitherCanvas` handles this itself.
 7. No stock photos, realistic anatomy, blood or red crosses.
@@ -61,7 +61,7 @@ The `@ n%` tokens are built with `color-mix()` from the raw palette. Never write
 | `--risk-caution` | `#EAB308` yellow | Elevated risk | ⚠ warning triangle and "Caution" |
 | `--risk-danger`  | `#EF4444` red    | High risk     | ✕ cross and "Danger"             |
 
-Reserved for the planner's 3D view: needle path segments, the skin safe-zone map, the target, and the risk breakdown. On the landing page, only the hero graphic may use them, as a one-path preview with a labelled legend. Everything else stays monochrome.
+Reserved for the planner's 3D view: needle path segments, the skin safe-zone map, the target, and the risk breakdown. The landing page is fully monochrome. If a risk preview is ever added there, it needs a labelled legend.
 
 In the 3D view, a coloured segment or heat-map region must have a nearby label, tooltip or legend entry with the word and icon. In the risk breakdown, each row shows `<RiskLabel>` next to its number. Don't use risk colours for button fills, badge tones, borders or text emphasis.
 
@@ -219,28 +219,21 @@ How it works: the scene renders into a low-resolution target (2×2 samples per d
 
 Props: `setup`, `pixelSize` (default 3), `levels` (2 or 3; default from `--dither-levels`), `matrix` (4 or 8), `palette` (override any of `bg`/`mid`/`fg`/`safe`/`caution`/`danger` with a theme variable name, e.g. `{ fg: "--color-text-muted" }`), `contrast`, `brightness`, `paused`, `label` (set it for meaningful images, leave it off for decorative ones), `className`, `style`. The element fills its container, so give it a size.
 
-The landing hero (`src/pages/landing/HeroAnatomy.tsx`) shows a full example. It also takes real pipeline meshes:
+`src/pages/landing/HeroAnatomy.tsx` shows a full example, in two views:
+
+- `view="hero"` (landing hero): only the anatomy (ribs, spine, lungs), with no needle or markers. It is interactive (`scenes/heroControls.ts`). It follows the mouse up to ±60° left-right and ±25° up-down with damping. Drag spins it a full 360°, the wheel or a pinch zooms in a little, it drifts back after release, and it auto-rotates when idle. Touch drag works on phones, and vertical swipes still scroll the page. With reduced motion there is no auto-rotate, the follow range is smaller, and it snaps to input instead of easing. `onFirstInteraction` fires once, which the landing page uses to fade its hint.
+- `view="poster"` (demo poster): slow sway with a white needle. Set `riskPreview` and `needle.segments` to colour the path with risk markers.
+
+Both take real pipeline meshes:
 
 ```tsx
 <HeroAnatomy
   models={{
     ribs: "/cases/case01/ribs.glb",
     lungs: "/cases/case01/lungs.glb",
-    lesion: "/cases/case01/lesion.glb",
-  }}
-  needle={{
-    entry: [x, y, z], // mm, from meta.json
-    target: [x, y, z],
-    segments: [
-      { to: 0.6, risk: "safe" },
-      { to: 0.7, risk: "caution" },
-      { to: 1, risk: "safe" },
-    ],
   }}
 />
 ```
-
-`riskPreview={false}` draws the path in plain white (used for the demo poster).
 
 The models are rotated from CT patient space (LPS) to three.js y-up, centred and scaled to fit. If they fail to load, the procedural meshes stay.
 

@@ -1,17 +1,18 @@
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { DitherCanvas, type DitherSceneSetup } from "../../components/DitherCanvas";
 import { Panel } from "../../components/Panel";
 import { Reveal } from "../../components/Reveal";
-import { RiskLabel } from "../../components/RiskLabel";
 import { SectionHeader } from "../../components/SectionHeader";
 import { HeroAnatomy } from "./HeroAnatomy";
 import {
   IconArrowRight,
+  IconDrag,
   IconExplain,
   IconHandNeedle,
   IconHeadWindow,
+  IconMouse,
   IconPath,
   IconPlay,
   IconSkinMap,
@@ -39,62 +40,45 @@ export default function Landing() {
 /* ---------------- Hero ---------------- */
 
 function Hero() {
+  const [hintVisible, setHintVisible] = useState(true);
+  const [canHover] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(hover: hover) and (pointer: fine)").matches,
+  );
+  const hideHint = useCallback(() => setHintVisible(false), []);
+
   return (
     <section className="lp-hero" aria-labelledby="hero-title">
-      <div className="pf-container lp-hero__grid">
+      <HeroAnatomy className="lp-hero__canvas" onFirstInteraction={hideHint} />
+
+      <div className="pf-container lp-hero__overlay">
         <div className="lp-hero__copy">
-          <img
-            src="/logo-on-dark.png"
-            alt="Pathfinder"
-            className="lp-hero__logo"
-            width={923}
-            height={184}
-          />
           <h1 id="hero-title" className="lp-hero__title">
             Find the safest path to the spot that&nbsp;matters.
           </h1>
           <p className="lp-hero__sub">
-            Pathfinder turns a real chest CT into a 3D body, scores every lung biopsy needle route
-            for risk, and explains the safest one.
+            Turns a real chest CT into a 3D body and finds the safest biopsy needle route.
           </p>
           <div className="lp-hero__actions">
-            <Button to="/planner" variant="primary" size="lg" iconEnd={<IconArrowRight />}>
+            <Button to="/planner" variant="primary" iconEnd={<IconArrowRight />}>
               Try the planner
             </Button>
-            <Button to="/#demo" variant="secondary" size="lg" iconStart={<IconPlay />}>
+            <Button to="/#demo" variant="secondary" iconStart={<IconPlay />}>
               Watch the demo
             </Button>
           </div>
-          <ul className="lp-hero__tags" aria-label="Highlights">
-            <li>
-              <Badge tone="primary" dot>
-                Real CT scans
-              </Badge>
-            </li>
-            <li>
-              <Badge>Live route risk</Badge>
-            </li>
-            <li>
-              <Badge>Explained by Gemini</Badge>
-            </li>
-          </ul>
         </div>
-
-        <div className="lp-hero__visual">
-          <HeroAnatomy className="lp-hero__canvas" />
-          <div className="lp-hud" aria-hidden="true">
-            <span className="lp-hud__tl pf-mono">Chest CT · 3D</span>
-            <span className="lp-hud__tr">
-              <RiskLabel level="safe" />
-              <RiskLabel level="caution" />
-            </span>
-            <span className="lp-hud__br pf-mono">
-              <i className="lp-hud__swatch lp-hud__swatch--accent" /> Target
-            </span>
-            <span className="lp-hud__bl pf-mono">Stylised model · risk preview</span>
-          </div>
-        </div>
+        <p className="lp-hero__note pf-mono">Stylised model</p>
       </div>
+
+      <p
+        className={["lp-hero__hint pf-mono", !hintVisible && "is-hidden"].filter(Boolean).join(" ")}
+        aria-hidden="true"
+      >
+        {canHover ? <IconMouse /> : <IconDrag />}
+        {canHover ? "Move your mouse to look around · drag to spin" : "Drag to look around"}
+      </p>
     </section>
   );
 }

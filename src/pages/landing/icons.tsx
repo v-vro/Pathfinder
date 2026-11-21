@@ -20,6 +20,19 @@ export const IconArrowRight = () => (
   </svg>
 );
 
+export const IconMouse = () => (
+  <svg {...base}>
+    <rect x="6.5" y="3" width="11" height="18" rx="5.5" />
+    <path d="M12 7v3" />
+  </svg>
+);
+
+export const IconDrag = () => (
+  <svg {...base}>
+    <path d="M4 12h16M7 9l-3 3 3 3M17 9l3 3-3 3" />
+  </svg>
+);
+
 export const IconPlay = () => (
   <svg {...base}>
     <path d="M8 5.5v13l10-6.5z" fill="currentColor" stroke="none" />

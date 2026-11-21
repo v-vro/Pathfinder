@@ -21,143 +21,107 @@
 
 /* ---------------- Hero ---------------- */
 
+/* Full-bleed interactive canvas; copy is a compact overlay, bottom-left. */
 .lp-hero {
   position: relative;
-  display: flex;
-  align-items: center;
-  min-height: calc(100svh - var(--nav-height));
+  height: 100svh;
+  min-height: 560px;
   margin-top: calc(var(--nav-height) * -1);
-  padding-top: var(--nav-height);
   overflow: hidden;
 }
 
-.lp-hero__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
-  align-items: center;
-  gap: var(--space-6);
-  padding-block: var(--space-7);
+.lp-hero__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.lp-hero__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding-bottom: var(--space-7);
+  /* Let drags pass through to the canvas everywhere except the buttons. */
+  pointer-events: none;
 }
 
 .lp-hero__copy {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--space-5);
-  max-width: 36rem;
+  gap: var(--space-3);
+  max-width: 24rem;
+  padding: var(--space-5);
+  margin: calc(var(--space-5) * -1);
+  /* Solid backing that fades out, so text stays readable over the skeleton. */
+  background: radial-gradient(closest-side, var(--color-bg) 55%, transparent);
 }
 
-.lp-hero__logo {
-  width: clamp(200px, 26vw, 320px);
-  height: auto;
-  filter: var(--logo-filter);
-  margin-bottom: var(--space-2);
+.lp-hero__copy a,
+.lp-hero__copy button {
+  pointer-events: auto;
 }
 
 .lp-hero__title {
-  font-size: var(--text-display);
+  font-size: var(--text-2xl);
   font-weight: var(--weight-black);
-  line-height: 1.04;
-  letter-spacing: -0.03em;
+  line-height: var(--leading-tight);
   text-wrap: balance;
 }
 
 .lp-hero__sub {
-  font-size: var(--text-lg);
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
-  max-width: 32rem;
 }
 
 .lp-hero__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.lp-hero__tags {
-  display: flex;
-  flex-wrap: wrap;
   gap: var(--space-2);
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  list-style: none;
+  margin-top: var(--space-1);
 }
 
-.lp-hero__visual {
-  position: relative;
-  aspect-ratio: 1 / 1;
-  max-height: min(680px, calc(100svh - var(--nav-height) - var(--space-6)));
-  width: 100%;
-  justify-self: center;
-}
-
-.lp-hero__canvas {
-  position: absolute;
-  inset: 0;
-  /* Soft edge so the canvas melts into the page. */
-  mask-image: radial-gradient(closest-side, #000 78%, transparent 100%);
-  -webkit-mask-image: radial-gradient(closest-side, #000 78%, transparent 100%);
-}
-
-.lp-hud {
-  position: absolute;
-  inset: 6%;
-  pointer-events: none;
+.lp-hero__note {
   color: var(--color-text-muted);
-}
-
-.lp-hud > span {
-  position: absolute;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
   font-size: 0.6875rem;
 }
 
-.lp-hud__tl {
-  top: 0;
-  left: 0;
-}
-.lp-hud__tr {
-  top: 0;
-  right: 0;
-}
-
-.lp-hud > .lp-hud__tr {
-  gap: var(--space-3);
-}
-.lp-hud__bl {
-  bottom: 0;
-  left: 0;
-}
-.lp-hud__br {
-  bottom: 0;
-  right: 0;
+.lp-hero__hint {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-5);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  transform: translateX(-50%);
+  color: var(--color-text-muted);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: opacity var(--duration-slow) var(--ease-out);
 }
 
-.lp-hud__swatch {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
+.lp-hero__hint svg {
+  width: 16px;
+  height: 16px;
 }
 
-.lp-hud__swatch--accent {
-  background: var(--color-accent);
-  border-radius: 50%;
+.lp-hero__hint.is-hidden {
+  opacity: 0;
 }
 
-@media (max-width: 900px) {
-  .lp-hero {
-    min-height: auto;
+@media (max-width: 700px) {
+  .lp-hero__copy {
+    max-width: none;
   }
-  .lp-hero__grid {
-    grid-template-columns: 1fr;
-    gap: var(--space-4);
+  .lp-hero__note {
+    display: none;
   }
-  .lp-hero__visual {
-    max-width: 520px;
-    max-height: none;
+  .lp-hero__hint {
+    top: calc(var(--nav-height) + var(--space-2));
+    bottom: auto;
   }
 }
 

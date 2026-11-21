@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { DitherSceneSetup } from "../../../components/DitherCanvas";
+import { HeroControls } from "./heroControls";
 import {
   createGlowSprite,
   createMarkerMaterial,
@@ -31,7 +32,7 @@ export interface AnatomySceneOptions {
   modelRotation?: Vec3;
   /** Framing preset. */
   view?: "hero" | "poster";
-  /** Colour the needle path with risk markers (hero only). Off = plain white path. */
+  /** Colour the needle path with risk markers. Off (default) = plain white path. */
   riskPreview?: boolean;
 }
 
@@ -361,8 +362,103 @@ function backdrop(): THREE.Mesh {
   return mesh;
 }
 
+function addLights(scene: THREE.Scene) {
+  scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+  const key = new THREE.DirectionalLight(0xffffff, 2.4);
+  key.position.set(-2.5, 3, 4);
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0xffffff, 1.6);
+  rim.position.set(3, 1, -4);
+  scene.add(rim);
+}
+
+export interface HeroSceneOptions {
+  models?: AnatomyModels;
+  modelRotation?: Vec3;
+}
+
+/** Size of the anatomy the camera frames (scene units). */
+const FRAME_HEIGHT = 2.75; // includes a margin for perspective on the nearest ribs
+const FRAME_WIDTH = 2.4;
+const FRAME_CENTRE_Y = -0.02;
+
 /**
- * Builds the stylised ribcage + lungs + needle scene for <DitherCanvas>.
+ * Landing hero: just the anatomy (ribs, spine, lungs), large and centred, driven by
+ * mouse-follow, drag-to-spin, zoom and idle auto-rotate (see heroControls.ts).
+ */
+export function createHeroScene(options: HeroSceneOptions = {}): DitherSceneSetup {
+  const { models, modelRotation = [-Math.PI / 2, 0, 0] } = options;
+
+  return ({ scene, camera, renderer, reducedMotion, invalidate }) => {
+    const fog = new THREE.Fog(0x000000, 5, 8.5);
+    scene.fog = fog;
+    scene.add(backdrop());
+    addLights(scene);
+
+    const body = new THREE.Group();
+    scene.add(body);
+
+    const procedural = new THREE.Group();
+    procedural.add(buildRibs().group, buildLung(-1), buildLung(1));
+    body.add(procedural);
+
+    const controls = new HeroControls(renderer.domElement, {
+      reducedMotion,
+      invalidate,
+    });
+
+    let cancelled = false;
+    let loadedRoot: THREE.Group | null = null;
+    if (models && Object.values(models).some(Boolean)) {
+      loadModels(models, modelRotation)
+        .then(({ root }) => {
+          if (cancelled) {
+            disposeObject(root);
+            return;
+          }
+          body.remove(procedural);
+          disposeObject(procedural);
+          loadedRoot = root;
+          body.add(root);
+          invalidate();
+        })
+        .catch((err) =>
+          console.warn("[HeroScene] could not load models, keeping procedural meshes", err),
+        );
+    }
+
+    const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+
+    return {
+      update({ delta }) {
+        controls.update(delta);
+        body.rotation.set(controls.pitch, controls.yaw, 0);
+
+        // Fit the anatomy to the canvas. Wide: ~80-85% of the height, centred.
+        // Narrow (phones): fit the width and sit in the upper part, above the hero text.
+        const narrow = camera.aspect < 0.9;
+        const fitHeight = FRAME_HEIGHT / ((narrow ? 0.6 : 0.82) * 2 * tanHalf);
+        const fitWidth = FRAME_WIDTH / (0.9 * 2 * tanHalf * camera.aspect);
+        const distance = Math.max(fitHeight, fitWidth) / controls.zoom;
+        const visibleHeight = 2 * distance * tanHalf;
+        const y = FRAME_CENTRE_Y - (narrow ? 0.14 * visibleHeight : 0);
+        camera.position.set(0, y, distance);
+        camera.lookAt(0, y, 0);
+        fog.near = distance - 0.1;
+        fog.far = distance + 3.4;
+      },
+      dispose() {
+        cancelled = true;
+        controls.dispose();
+        disposeObject(scene);
+        if (loadedRoot) disposeObject(loadedRoot);
+      },
+    };
+  };
+}
+
+/**
+ * Stylised ribcage + lungs + needle scene for <DitherCanvas> (used for the demo poster).
  * Pass `models` to swap in real .glb meshes from the pipeline.
  */
 export function createAnatomyScene(options: AnatomySceneOptions = {}): DitherSceneSetup {
@@ -371,7 +467,7 @@ export function createAnatomyScene(options: AnatomySceneOptions = {}): DitherSce
     needle: needleOpt,
     modelRotation = [-Math.PI / 2, 0, 0],
     view = "hero",
-    riskPreview = true,
+    riskPreview = false,
   } = options;
 
   return ({ scene, camera, reducedMotion, invalidate }) => {
@@ -386,13 +482,7 @@ export function createAnatomyScene(options: AnatomySceneOptions = {}): DitherSce
       camera.lookAt(-0.1, 0.1, 0);
     }
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(-2.5, 3, 4);
-    scene.add(key);
-    const rim = new THREE.DirectionalLight(0xffffff, 1.6);
-    rim.position.set(3, 1, -4);
-    scene.add(rim);
+    addLights(scene);
 
     const body = new THREE.Group();
     scene.add(body);

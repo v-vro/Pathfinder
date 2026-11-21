@@ -27,11 +27,10 @@ export interface LayoutProps {
 
 /** Shared page shell: navbar, <main id="main">, footer. Used as a route element. */
 export function Layout({ hideFooter }: LayoutProps) {
-  const { pathname } = useLocation();
   return (
     <div className="pf-layout">
       <ScrollManager />
-      <NavBar revealBrandOnScroll={pathname === "/"} />
+      <NavBar />
       <main id="main" className="pf-layout__main" tabIndex={-1}>
         <Outlet />
       </main>
