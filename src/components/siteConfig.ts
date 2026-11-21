@@ -13,5 +13,4 @@ export const DEFAULT_NAV_LINKS: NavLink[] = [
   { label: "Demo", to: "/#demo" },
 ];
 
-// TODO: replace with the real team names.
-export const TEAM = ["Team member 1", "Team member 2", "Team member 3", "Team member 4"];
+export const TEAM = ["Eric Fu", "Ibrahim Farrukh", "Shourya Walia"];
