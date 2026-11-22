@@ -153,7 +153,10 @@ export function PatientDrawer({ plan, snapshot, onClose }: { plan: PlanJSON; sna
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan]);
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: 'smooth' }), [msgs]);
+  // braces matter: scrollIntoView now returns a Promise, and React would call a returned value as a cleanup function
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [msgs]);
 
   const ask = async () => {
     const question = q.trim();

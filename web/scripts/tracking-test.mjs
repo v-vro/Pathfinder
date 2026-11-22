@@ -10,9 +10,9 @@ const page = await ctx.newPage();
 const logs = [];
 page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
-await page.goto('http://localhost:5173/', { waitUntil: 'load' });
+await page.goto('http://localhost:5173/planner?plan', { waitUntil: 'load' });
 await page.waitForFunction(() => !document.querySelector('.loading'), null, { timeout: 120000 });
-await page.click(which === 'head' ? 'text=Look around' : 'text=Aim by hand');
+await page.click(which === 'head' ? 'button.mode:has-text("Head")' : 'button.mode:has-text("Hand")');
 const samples = [];
 for (let i = 0; i < 10; i++) {
   await page.waitForTimeout(500);

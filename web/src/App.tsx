@@ -6,10 +6,11 @@ import { entryFromDirection } from './engine/pathAnalysis';
 import { buildPlan, type PlanJSON } from './engine/plan';
 import { autoPlan, computeSkinMap, evaluate, type Candidate, type SkinMap } from './engine/planner';
 import { L, type Vec3 } from './engine/types';
-import { norm, scale, sub } from './engine/vec';
+import { dot as dot3, norm, scale, sub } from './engine/vec';
 import { Viewer, type LayerName, type MarkerKind } from './scene/Viewer';
 import { Tracker, type HandPointer, type HeadPose } from './tracking/tracker';
 import { DoctorDrawer, PatientDrawer } from './ui/Drawers';
+import { PanelBoundary } from './ui/PanelBoundary';
 import { RiskPanel } from './ui/RiskPanel';
 import { SliceView, type CtWindow, type SliceMode } from './ui/SliceView';
 import { DitherLoader, Mark } from './ui/Brand';
@@ -48,6 +49,7 @@ export default function App() {
   const [outer, setOuter] = useState<Vec3 | null>(null);
   const [locked, setLocked] = useState(false);
   const lockedRef = useRef(false);
+  const debugState = useRef<{ entry: Vec3 | null; locked: boolean }>({ entry: null, locked: false });
   const [map, setMap] = useState<SkinMap | null>(null);
   const [plans, setPlans] = useState<Candidate[]>([]);
   const [planning, setPlanning] = useState(false);
@@ -68,6 +70,7 @@ export default function App() {
   const [screenMm, setScreenMm] = useState(() => Number(storageGet('pf.screenMm') ?? 301));
 
   const target: Vec3 | null = data ? data.meta.target.center : null;
+  debugState.current = { entry: cand?.entry ?? null, locked };
   useEffect(() => {
     lockedRef.current = locked;
   }, [locked]);
@@ -80,7 +83,7 @@ export default function App() {
     const v = new Viewer(canvasRef.current!);
     viewerRef.current = v;
     v.setScreen({ widthMm: screenMm });
-    (window as unknown as { __pf: unknown }).__pf = { viewer: v, tracker: () => trackerRef.current };
+    (window as unknown as { __pf: unknown }).__pf = { viewer: v, tracker: () => trackerRef.current, state: () => debugState.current };
     let cancelled = false;
     (async () => {
       try {
@@ -147,16 +150,25 @@ export default function App() {
   }, [cand, outer, locked]);
 
   // ---------------------------------------------------------------- aiming (the needle always points at the nodule)
-  const aimToward = useCallback(
-    (p: Vec3 | null, outerPt: Vec3 | null = null) => {
-      if (!data || !p || lockedRef.current) return;
+  /** Candidate path for a needle pointing from p toward the nodule (null if there's no skin entry). */
+  const candidateToward = useCallback(
+    (p: Vec3 | null): Candidate | null => {
+      if (!data || !p) return null;
       const tgt = data.meta.target.center;
       const entry = entryFromDirection(data, tgt, norm(sub(p, tgt)));
-      if (!entry) return;
-      setCand(evaluate(data, entry, tgt));
-      setOuter(outerPt);
+      return entry ? evaluate(data, entry, tgt) : null;
     },
     [data],
+  );
+  const aimToward = useCallback(
+    (p: Vec3 | null, outerPt: Vec3 | null = null) => {
+      if (lockedRef.current) return;
+      const c = candidateToward(p);
+      if (!c) return;
+      setCand(c);
+      setOuter(outerPt);
+    },
+    [candidateToward],
   );
 
   const raf = useRef(0);
@@ -178,18 +190,55 @@ export default function App() {
     else if (cand) setLocked(true);
   };
 
+  // Hand: pinch to aim, release to hold. While pinched the needle follows the pinch point; on release it
+  // holds the aim from just before the fingers started to open (release motion would otherwise jerk it).
   const pinchPrev = useRef(false);
+  const aimHistory = useRef<{ t: number; c: Candidate }[]>([]);
+  const lastAimDir = useRef<Vec3 | null>(null);
+  const holdFromHistory = () => {
+    const h = aimHistory.current;
+    if (!h.length) return;
+    const cutoff = performance.now() - 150;
+    const pick = [...h].reverse().find((e) => e.t <= cutoff) ?? h[0];
+    setCand(pick.c);
+    setOuter(null);
+    setLocked(true);
+    lockedRef.current = true;
+    aimHistory.current = [];
+  };
   useEffect(() => {
-    if (!hand || !data || !viewerRef.current) {
+    if (!data || !viewerRef.current) return;
+    if (!hand) {
+      if (pinchPrev.current) holdFromHistory(); // lost the hand mid-pinch: hold the last good aim
       pinchPrev.current = false;
       return;
     }
-    if (hand.pinch && !pinchPrev.current) setLocked((l) => !l);
+    const startedPinch = hand.pinch && !pinchPrev.current;
+    const released = !hand.pinch && pinchPrev.current;
     pinchPrev.current = hand.pinch;
-    if (lockedRef.current) return;
+    if (released) return holdFromHistory();
+    if (!hand.pinch) return;
+    if (startedPinch) {
+      setLocked(false);
+      lockedRef.current = false;
+      aimHistory.current = [];
+      lastAimDir.current = null;
+    }
     const glass = viewerRef.current.glassToLPS(hand.nx, hand.ny, 0);
-    aimToward(glass, glass);
-  }, [hand, data, aimToward]);
+    const tgt = data.meta.target.center;
+    const dir = norm(sub(glass, tgt));
+    // ignore hand wobble under 1° so the needle sits still and the risk numbers don't flicker
+    if (lastAimDir.current && dot3(dir, lastAimDir.current) > Math.cos((1 * Math.PI) / 180)) return;
+    lastAimDir.current = dir;
+    const c = candidateToward(glass);
+    if (!c) return;
+    setCand(c);
+    setOuter(glass);
+    const now = performance.now();
+    aimHistory.current.push({ t: now, c });
+    while (aimHistory.current.length && now - aimHistory.current[0].t > 600) aimHistory.current.shift();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hand, data, candidateToward]);
 
   // ---------------------------------------------------------------- tracking
   const onHead = (p: HeadPose | null) => {
@@ -450,7 +499,7 @@ export default function App() {
       )}
 
       <footer className="dock">
-        {!cand && data && !status && <p className="hint">Hover to aim. Click to hold.</p>}
+        {data && !status && (handOn ? !hand?.pinch && !locked : !cand) && <p className="hint">{handOn ? "Pinch to aim. Release to hold." : "Hover to aim. Click to hold."}</p>}
         <div className="actions">
           <button className="primary" onClick={runAutoPlan} disabled={!map || planning}>
             {planning ? 'Searching…' : 'Find safest path'}
@@ -483,8 +532,16 @@ export default function App() {
 
       {handPx && <div className={`hand-cursor ${hand?.pinch ? 'pinch' : ''} ${locked ? 'locked' : ''}`} style={handPx} />}
 
-      {drawer === 'doctor' && plan && <DoctorDrawer plan={plan} onClose={() => setDrawer(null)} />}
-      {drawer === 'patient' && plan && <PatientDrawer plan={plan} snapshot={() => viewerRef.current!.snapshot()} onClose={() => setDrawer(null)} />}
+      {drawer === 'doctor' && plan && (
+        <PanelBoundary onClose={() => setDrawer(null)}>
+          <DoctorDrawer plan={plan} onClose={() => setDrawer(null)} />
+        </PanelBoundary>
+      )}
+      {drawer === 'patient' && plan && (
+        <PanelBoundary onClose={() => setDrawer(null)}>
+          <PatientDrawer plan={plan} snapshot={() => viewerRef.current!.snapshot()} onClose={() => setDrawer(null)} />
+        </PanelBoundary>
+      )}
 
       {status && (
         <div className="loading">
