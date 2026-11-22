@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 const browser = await chromium.launch({ channel: 'msedge', args: ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=d3d11'] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-await page.goto('http://localhost:5173/?plan', { waitUntil: 'load' });
+await page.goto('http://localhost:5173/planner?plan', { waitUntil: 'load' });
 await page.waitForFunction(() => !document.querySelector('.loading'), null, { timeout: 120000 });
 const geo = () => page.evaluate(() => window.__pf.viewer.renderer.info.memory.geometries);
 console.log('geometries before aiming', await geo());

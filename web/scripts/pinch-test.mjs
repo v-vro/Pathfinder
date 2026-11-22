@@ -10,7 +10,7 @@ const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, p
 const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
-await page.goto('http://localhost:5173/?plan', { waitUntil: 'load' });
+await page.goto('http://localhost:5173/planner?plan', { waitUntil: 'load' });
 await page.waitForFunction(() => !document.querySelector('.loading'), null, { timeout: 120000 });
 await page.keyboard.press('2'); // turn to the back, where the nodule is reachable
 await page.waitForTimeout(900);

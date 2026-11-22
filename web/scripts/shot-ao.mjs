@@ -5,7 +5,7 @@ const browser = await chromium.launch({ channel: 'msedge' });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 page.on('console', (m) => m.type() === 'warning' && console.log('[warn]', m.text().slice(0, 200)));
-await page.goto('http://localhost:5173/?plan', { waitUntil: 'load' });
+await page.goto('http://localhost:5173/planner?plan', { waitUntil: 'load' });
 await page.waitForFunction(() => !document.querySelector('.loading'), null, { timeout: 120000 });
 await page.waitForTimeout(1000);
 await page.evaluate(() => (window.__pf.viewer.gtao.output = 5)); // denoised AO only

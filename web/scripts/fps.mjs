@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 const out = process.argv[2] ?? '.';
 const browser = await chromium.launch({ channel: 'msedge', args: ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=d3d11'] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-await page.goto('http://localhost:5173/?plan', { waitUntil: 'load' });
+await page.goto('http://localhost:5173/planner?plan', { waitUntil: 'load' });
 await page.waitForFunction(() => !document.querySelector('.loading'), null, { timeout: 120000 });
 await page.waitForTimeout(1500);
 const fps = await page.evaluate(

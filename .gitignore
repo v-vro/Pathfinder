@@ -17,3 +17,8 @@ web/test-results/
 # Raw third-party downloads (the processed body model lives in web/public/models/body)
 assets_incoming/
 *.log
+
+# Local leftovers at the repo root (not part of the project)
+/dist/
+/node_modules/
+.DS_Store

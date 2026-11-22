@@ -6,7 +6,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}\n${e.stack?.split('\n').slice(0, 6).join('\n')}`));
 page.on('console', (m) => m.type() === 'error' && errors.push(`[console] ${m.text().slice(0, 400)}`));
-await page.goto('http://localhost:5173/?plan', { waitUntil: 'load' });
+await page.goto('http://localhost:5173/planner?plan', { waitUntil: 'load' });
 await page.waitForFunction(() => !document.querySelector('.loading'), null, { timeout: 120000 });
 await page.click('text=Find safest path');
 await page.waitForTimeout(1500);
