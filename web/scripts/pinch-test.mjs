@@ -15,7 +15,7 @@ await page.waitForFunction(() => !document.querySelector('.loading'), null, { ti
 await page.keyboard.press('2'); // turn to the back, where the nodule is reachable
 await page.waitForTimeout(900);
 await page.click('button.mode:has-text("Hand")');
-await page.waitForFunction(() => !!window.__pf.tracker(), null, { timeout: 30000 });
+await page.waitForFunction(() => window.__pf.tracker()?.stats.frames > 5, null, { timeout: 30000 }); // camera running (the tracker now exists before it starts)
 await page.evaluate(() => window.__pf.tracker().setEnabled(false, false)); // stop real detection; we drive onHand
 const send = (nx, ny, pinch) => page.evaluate(([x, y, p]) => window.__pf.tracker().onHand({ nx: x, ny: y, pinch: p, depth: 0.2 }), [nx, ny, pinch]);
 const state = () => page.evaluate(() => window.__pf.state());

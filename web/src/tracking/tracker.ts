@@ -51,34 +51,73 @@ export class Tracker {
     this.video.muted = true;
   }
 
+  private models: Promise<void> | null = null;
+  private camera: Promise<void> | null = null;
+
+  /**
+   * Load both models and warm up their GPU shaders, without the camera. Called in the background when the
+   * planner opens, so switching on Head or Hand only has to open the camera (first-time model load + shader
+   * compile took ~5 s, which looked like "the hand isn't detected"). Safe to call repeatedly.
+   */
+  preload(): Promise<void> {
+    if (!this.models) {
+      this.models = (async () => {
+        const fileset = await FilesetResolver.forVisionTasks('/mediapipe');
+        const [face, hand] = await Promise.all([
+          FaceLandmarker.createFromOptions(fileset, {
+            baseOptions: { modelAssetPath: '/models/face_landmarker.task', delegate: 'GPU' },
+            runningMode: 'VIDEO',
+            numFaces: 1,
+          }),
+          HandLandmarker.createFromOptions(fileset, {
+            baseOptions: { modelAssetPath: '/models/hand_landmarker.task', delegate: 'GPU' },
+            runningMode: 'VIDEO',
+            numHands: 1,
+            minHandDetectionConfidence: 0.5, // MediaPipe defaults; lower values let faces pass as hands
+            minHandPresenceConfidence: 0.5,
+            minTrackingConfidence: 0.5,
+          }),
+        ]);
+        this.face = face;
+        this.hand = hand;
+        // one pass over a blank frame compiles the GPU programs now instead of on the first camera frame
+        const c = document.createElement('canvas');
+        c.width = 640;
+        c.height = 360;
+        c.getContext('2d')!.fillRect(0, 0, c.width, c.height);
+        const t = Math.max(performance.now(), this.lastTs + 1);
+        this.lastTs = t;
+        face.detectForVideo(c, t);
+        hand.detectForVideo(c, t);
+      })().catch((e) => {
+        this.models = null; // let the next call retry
+        throw e;
+      });
+    }
+    return this.models;
+  }
+
+  private openCamera(): Promise<void> {
+    if (!this.camera) {
+      this.camera = (async () => {
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+          audio: false,
+        });
+        this.video.srcObject = this.stream;
+        await this.video.play();
+      })().catch((e) => {
+        this.camera = null;
+        throw e;
+      });
+    }
+    return this.camera;
+  }
+
+  /** Open the camera and start tracking. Concurrent calls share the same camera and models. */
   async start(opts: TrackerOptions) {
     this.opts = { ...this.opts, ...opts };
-    if (!this.stream) {
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-        audio: false,
-      });
-      this.video.srcObject = this.stream;
-      await this.video.play();
-    }
-    const fileset = await FilesetResolver.forVisionTasks('/mediapipe');
-    if (this.opts.face && !this.face) {
-      this.face = await FaceLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: '/models/face_landmarker.task', delegate: 'GPU' },
-        runningMode: 'VIDEO',
-        numFaces: 1,
-      });
-    }
-    if (this.opts.hand && !this.hand) {
-      this.hand = await HandLandmarker.createFromOptions(fileset, {
-        baseOptions: { modelAssetPath: '/models/hand_landmarker.task', delegate: 'GPU' },
-        runningMode: 'VIDEO',
-        numHands: 1,
-        minHandDetectionConfidence: 0.35,
-        minHandPresenceConfidence: 0.35,
-        minTrackingConfidence: 0.35,
-      });
-    }
+    await Promise.all([this.openCamera(), this.preload()]);
     if (!this.running) {
       this.running = true;
       this.loop();
@@ -96,6 +135,7 @@ export class Tracker {
     this.running = false;
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
+    this.camera = null;
   }
 
   // Poll on animation frames and run detection whenever the camera delivers a new frame.
@@ -135,9 +175,18 @@ export class Tracker {
     const lm = r.faceLandmarks?.[0];
     this.stats.face = !!lm;
     if (!lm || lm.length < 474) {
+      this.faceBox = null;
       this.onHead?.(null);
       return;
     }
+    let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+    for (const p of lm) {
+      if (p.x < x0) x0 = p.x;
+      if (p.x > x1) x1 = p.x;
+      if (p.y < y0) y0 = p.y;
+      if (p.y > y1) y1 = p.y;
+    }
+    this.faceBox = { x0, y0, x1, y1, t };
     const W = this.video.videoWidth;
     const H = this.video.videoHeight;
     const a = lm[468];
@@ -152,20 +201,40 @@ export class Tracker {
     this.onHead?.({ x: this.fx.filter(x, t), y: this.fy.filter(y, t), z: this.fz.filter(z, t) });
   }
 
+  // False pinches: the hand model occasionally "finds" a hand in a face or a lit background for a frame or two, and
+  // if that phantom's thumb and index points land close together it reads as a pinch and drops the needle somewhere.
+  // Real pinches last much longer than a phantom, so a pinch only starts once the hand has been seen for a moment
+  // and the fingers have been together for a few frames (~0.1 s, not noticeable). With head tracking on, a "hand"
+  // sitting on the face is ignored outright.
+  private handSince = -1;
+  private pinchFrames = 0;
+  private faceBox: { x0: number; y0: number; x1: number; y1: number; t: number } | null = null;
+
   private processHand(r: ReturnType<HandLandmarker['detectForVideo']>, t: number) {
-    const lm = r.landmarks?.[0];
+    let lm: (typeof r.landmarks)[number] | undefined = r.landmarks?.[0];
+    if (lm && this.faceBox && t - this.faceBox.t < 200) {
+      const cx = (lm[0].x + lm[5].x + lm[9].x + lm[13].x + lm[17].x) / 5;
+      const cy = (lm[0].y + lm[5].y + lm[9].y + lm[13].y + lm[17].y) / 5;
+      const f = this.faceBox;
+      if (cx > f.x0 && cx < f.x1 && cy > f.y0 && cy < f.y1) lm = undefined; // palm on the face: not a real hand
+    }
     this.stats.hand = !!lm;
     if (!lm) {
+      this.handSince = -1;
+      this.pinchFrames = 0;
+      this.pinchState = false;
       this.onHand?.(null);
       return;
     }
+    if (this.handSince < 0) this.handSince = t;
     const tip = lm[8];
     const thumb = lm[4];
     const size = Math.hypot(lm[0].x - lm[5].x, lm[0].y - lm[5].y); // wrist -> index knuckle
     const pinchD = Math.hypot(tip.x - thumb.x, tip.y - thumb.y) / Math.max(size, 1e-3);
-    // hysteresis so the pinch doesn't flicker
+    // hysteresis so the pinch doesn't flicker; a new pinch must be held for 3 frames on a hand seen for 0.2 s
+    this.pinchFrames = pinchD < 0.38 ? this.pinchFrames + 1 : 0;
     if (this.pinchState && pinchD > 0.6) this.pinchState = false;
-    else if (!this.pinchState && pinchD < 0.38) this.pinchState = true;
+    else if (!this.pinchState && this.pinchFrames >= 3 && t - this.handSince >= 200) this.pinchState = true;
     // Pointer = midpoint of thumb and index tips: it barely moves when the fingers close or open,
     // unlike the fingertip alone, so pinching doesn't jerk the aim.
     const px = (tip.x + thumb.x) / 2;

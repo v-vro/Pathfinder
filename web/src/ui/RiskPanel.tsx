@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Candidate } from '../engine/planner';
 import { EVIDENCE, type Factor } from '../engine/riskModel';
+import { pathEvents } from '../engine/pathEvents';
 import { Meter } from './Brand';
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -50,12 +51,29 @@ export function RiskPanel({ cand, locked, title }: { cand: Candidate; locked: bo
         </>
       )}
 
+      {locked && <Steps cand={cand} />}
+
       <button className="link" onClick={() => setOpen(!open)} aria-expanded={open}>
         {open ? 'Less' : 'Details'}
       </button>
       {open && <Details cand={cand} />}
       {locked && <p className="note">Held. Click to release.</p>}
     </section>
+  );
+}
+
+/** What the needle meets on a held path, in order of depth. */
+function Steps({ cand }: { cand: Candidate }) {
+  const { events } = pathEvents(cand.analysis);
+  return (
+    <ol className="steps" aria-label="Along this path">
+      {events.map((e, i) => (
+        <li key={i} className={e.tone}>
+          <span className="d">{(e.depthMm / 10).toFixed(1)}</span>
+          <span>{e.label}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 

@@ -6,7 +6,7 @@ import { entryFromDirection } from './engine/pathAnalysis';
 import { buildPlan, type PlanJSON } from './engine/plan';
 import { autoPlan, computeSkinMap, evaluate, type Candidate, type SkinMap } from './engine/planner';
 import { L, type Vec3 } from './engine/types';
-import { dot as dot3, norm, scale, sub } from './engine/vec';
+import { dot as dot3, len, norm, scale, sub } from './engine/vec';
 import { Viewer, type LayerName, type MarkerKind } from './scene/Viewer';
 import { Tracker, type HandPointer, type HeadPose } from './tracking/tracker';
 import { DoctorDrawer, PatientDrawer } from './ui/Drawers';
@@ -102,6 +102,8 @@ export default function App() {
             setMap(m);
           }
           setStatus('');
+          // load the tracking models in the background so Head / Hand respond as soon as they're switched on
+          setTimeout(() => getTracker().preload().catch((e) => console.warn('tracking preload failed', e)), 300);
         }, 50);
       } catch (e) {
         console.error(e);
@@ -156,7 +158,11 @@ export default function App() {
       if (!data || !p) return null;
       const tgt = data.meta.target.center;
       const entry = entryFromDirection(data, tgt, norm(sub(p, tgt)));
-      return entry ? evaluate(data, entry, tgt) : null;
+      // p is the skin point under the pointer. If the needle wouldn't enter near it (pointer on an arm, or on the
+      // body's edge), the path would come out somewhere else, often the far side: ignore it and keep the current aim.
+      // (The display body is a fitted model, so allow some distance from the CT skin.)
+      if (!entry || len(sub(entry, p)) > 30) return null;
+      return evaluate(data, entry, tgt);
     },
     [data],
   );
@@ -193,6 +199,8 @@ export default function App() {
   // Hand: pinch to aim, release to hold. While pinched the needle follows the pinch point; on release it
   // holds the aim from just before the fingers started to open (release motion would otherwise jerk it).
   const pinchPrev = useRef(false);
+  /** Hand pointer (-1..1) to the screen pixel the hand cursor is drawn at. */
+  const handClient = (nx: number, ny: number): [number, number] => [((nx + 1) / 2) * window.innerWidth, ((1 - ny) / 2) * window.innerHeight];
   const aimHistory = useRef<{ t: number; c: Candidate }[]>([]);
   const lastAimDir = useRef<Vec3 | null>(null);
   const holdFromHistory = () => {
@@ -224,16 +232,21 @@ export default function App() {
       aimHistory.current = [];
       lastAimDir.current = null;
     }
-    const glass = viewerRef.current.glassToLPS(hand.nx, hand.ny, 0);
+    // Aim at the skin under the hand pointer, exactly like the mouse: the needle enters where you point, on the
+    // side you're looking at. (Aiming at a virtual plane through the chest swung the needle round to the far side,
+    // because the nodule sits close to that plane.) Off the body: keep the current aim.
+    const [cx, cy] = handClient(hand.nx, hand.ny);
+    const hit = viewerRef.current.pickSkin(cx, cy);
+    if (!hit) return;
     const tgt = data.meta.target.center;
-    const dir = norm(sub(glass, tgt));
+    const dir = norm(sub(hit, tgt));
     // ignore hand wobble under 1° so the needle sits still and the risk numbers don't flicker
     if (lastAimDir.current && dot3(dir, lastAimDir.current) > Math.cos((1 * Math.PI) / 180)) return;
     lastAimDir.current = dir;
-    const c = candidateToward(glass);
+    const c = candidateToward(hit);
     if (!c) return;
     setCand(c);
-    setOuter(glass);
+    setOuter(null);
     const now = performance.now();
     aimHistory.current.push({ t: now, c });
     while (aimHistory.current.length && now - aimHistory.current[0].t > 600) aimHistory.current.shift();
@@ -261,7 +274,28 @@ export default function App() {
     viewerRef.current?.clearHead();
   };
 
+  const getTracker = () => {
+    if (!trackerRef.current) {
+      const t = new Tracker();
+      t.onHead = (p) => onHead(p);
+      t.onHand = (h) => setHand(h);
+      let last = 0;
+      t.onStats = (s) => {
+        const now = performance.now();
+        if (now - last > 250) {
+          last = now;
+          setTstats({ ...s });
+        }
+      };
+      trackerRef.current = t;
+    }
+    return trackerRef.current;
+  };
+  // what the Head / Hand buttons currently say (a slow start must not apply stale choices)
+  const modes = useRef({ face: false, hand: false });
+
   const ensureTracker = async (face: boolean, handTrack: boolean) => {
+    modes.current = { face, hand: handTrack };
     if (!face) {
       recenter();
     }
@@ -271,23 +305,10 @@ export default function App() {
     }
     try {
       setTrackMsg('Starting camera');
-      if (!trackerRef.current) {
-        const t = new Tracker();
-        t.onHead = (p) => onHead(p);
-        t.onHand = (h) => setHand(h);
-        let last = 0;
-        t.onStats = (s) => {
-          const now = performance.now();
-          if (now - last > 250) {
-            last = now;
-            setTstats({ ...s });
-          }
-        };
-        trackerRef.current = t;
-      }
-      await trackerRef.current.start({ face, hand: handTrack });
-      trackerRef.current.setEnabled(face, handTrack);
-      if (camBox.current && !camBox.current.contains(trackerRef.current.video)) camBox.current.appendChild(trackerRef.current.video);
+      const t = getTracker();
+      await t.start({ face, hand: handTrack });
+      t.setEnabled(modes.current.face, modes.current.hand);
+      if (camBox.current && !camBox.current.contains(t.video)) camBox.current.appendChild(t.video);
       setTrackMsg('');
     } catch (e) {
       setTrackMsg(`Camera unavailable: ${e}`);
@@ -378,7 +399,7 @@ export default function App() {
   }, [data, cand, map, plans]);
 
   const cardTitle = !locked ? 'Aiming' : plans[0] === cand ? 'Safest path' : plans.includes(cand!) ? `Option ${plans.indexOf(cand!) + 1}` : 'Held path';
-  const handPx = hand ? { left: ((hand.nx + 1) / 2) * window.innerWidth, top: ((1 - hand.ny) / 2) * window.innerHeight } : null;
+  const handPx = hand ? (([left, top]) => ({ left, top }))(handClient(hand.nx, hand.ny)) : null;
   const camLine = !tstats
     ? trackMsg
     : [headOn ? (tstats.face ? 'head ok' : 'no face') : '', handOn ? (tstats.hand ? (hand?.pinch ? 'pinch' : 'hand ok') : 'no hand') : '', `${tstats.fps} fps`]
@@ -499,7 +520,7 @@ export default function App() {
       )}
 
       <footer className="dock">
-        {data && !status && (handOn ? !hand?.pinch && !locked : !cand) && <p className="hint">{handOn ? "Pinch to aim. Release to hold." : "Hover to aim. Click to hold."}</p>}
+        {data && !status && (handOn ? !hand?.pinch && !locked : !cand) && <p className="hint">{handOn ? 'Pinch to aim. Release to hold.' : 'Hover to aim. Click to hold.'}</p>}
         <div className="actions">
           <button className="primary" onClick={runAutoPlan} disabled={!map || planning}>
             {planning ? 'Searching…' : 'Find safest path'}
