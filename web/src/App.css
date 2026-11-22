@@ -69,6 +69,16 @@
   align-items: center;
   gap: 10px;
 }
+a.wordmark {
+  color: inherit;
+  text-decoration: none;
+  width: fit-content;
+}
+a.wordmark:hover .name {
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 4px;
+}
 .wordmark svg {
   flex: none;
 }

@@ -71,10 +71,10 @@ export function Reconstruction({ data, onDone, onBack }: { data: CaseData; onDon
   return (
     <div className="page recon">
       <nav className="rail" aria-label="Reconstruction steps">
-        <div className="wordmark">
+        <a className="wordmark" href="/" title="Back to the home page">
           <Mark size={24} />
           <span className="name">Pathfinder</span>
-        </div>
+        </a>
         <button className="link light back" onClick={onBack}>
           Back to scan
         </button>

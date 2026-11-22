@@ -411,7 +411,7 @@ export default function App() {
       <canvas ref={canvasRef} className="stage" onPointerMove={onPointerMove} onPointerDown={onPointerDown} onPointerUp={onPointerUp} />
 
       <header className="topbar">
-        <div className="wordmark">
+        <a className="wordmark" href="/" title="Back to the home page">
           <Mark />
           <div>
             <span className="name">Pathfinder</span>
@@ -421,7 +421,7 @@ export default function App() {
               </span>
             )}
           </div>
-        </div>
+        </a>
         <nav className="modes">
           <button className="mode" onClick={() => setStage('recon')}>
             Model

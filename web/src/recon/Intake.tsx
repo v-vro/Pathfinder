@@ -16,10 +16,10 @@ export function Intake({ data, onContinue }: { data: CaseData; onContinue: () =>
   return (
     <div className="page intake">
       <section className="intro">
-        <div className="wordmark">
+        <a className="wordmark" href="/" title="Back to the home page">
           <Mark size={30} />
           <span className="name">Pathfinder</span>
-        </div>
+        </a>
         <h1>The scan</h1>
         <p className="lede">One CT volume. Every view is cut from the same stack.</p>
 
