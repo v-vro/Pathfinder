@@ -1,0 +1,4 @@
+# Everything for local work: the API, its dev server, and the CT pipeline.
+-r requirements.txt
+-r pipeline/requirements.txt
+uvicorn[standard]

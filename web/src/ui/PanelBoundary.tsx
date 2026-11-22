@@ -23,7 +23,7 @@ export class PanelBoundary extends Component<{ children: ReactNode; onClose: () 
           </button>
         </div>
         <div className="drawer-body">
-          <p className="fine">{this.state.error}</p>
+          <p className="fine">Close it and open it again.</p>
         </div>
       </div>
     );

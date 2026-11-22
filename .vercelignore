@@ -1,0 +1,11 @@
+# Not needed to build or run the deployment (keeps CLI uploads small; secrets never leave the machine)
+.env
+.venv
+data
+dist
+node_modules
+web/node_modules
+web/dist
+web/test-results
+pipeline
+assets_incoming

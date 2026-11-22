@@ -1,0 +1,11 @@
+# CT → 3D case pipeline (fetch_case.py, segment.py, build_case.py). Local only, never deployed.
+numpy
+scipy
+scikit-image>=0.26
+SimpleITK
+pydicom
+trimesh
+fast-simplification
+requests
+tqdm
+TotalSegmentator

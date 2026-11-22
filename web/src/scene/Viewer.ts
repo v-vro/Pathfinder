@@ -719,8 +719,19 @@ export class Viewer {
     return (0.9 * this.Hmm) / (this.bodyInfo.headTopZ - this.bodyInfo.floorZ) / sChest;
   }
 
-  snapshot(): string {
-    return this.renderer.domElement.toDataURL('image/png');
+  /** The current view as a small JPEG data URL (sent to Gemini; must stay well under Vercel's 4.5 MB body limit). */
+  snapshot(maxSide = 1024): string {
+    const src = this.renderer.domElement;
+    const s = Math.min(1, maxSide / Math.max(src.width, src.height, 1));
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(src.width * s));
+    out.height = Math.max(1, Math.round(src.height * s));
+    const ctx = out.getContext('2d');
+    if (!ctx) return src.toDataURL('image/jpeg', 0.85);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, out.width, out.height);
+    ctx.drawImage(src, 0, 0, out.width, out.height);
+    return out.toDataURL('image/jpeg', 0.85);
   }
 
   // ------------------------------------------------------------------ head-coupled camera

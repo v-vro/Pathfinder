@@ -22,3 +22,6 @@ assets_incoming/
 /dist/
 /node_modules/
 .DS_Store
+
+# Vercel CLI
+.vercel/

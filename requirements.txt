@@ -1,14 +1,6 @@
-numpy
-scipy
-scikit-image>=0.26
-SimpleITK
-pydicom
-trimesh
-fast-simplification
-requests
-tqdm
-TotalSegmentator
-fastapi
-uvicorn[standard]
-google-genai
-python-dotenv
+# API runtime (server/). This is the ONLY file Vercel installs for the api/index.py function,
+# so keep it to what server/app.py imports. Pipeline deps: pipeline/requirements.txt.
+# Local setup (API + pipeline + uvicorn): pip install -r requirements-dev.txt
+fastapi>=0.115
+google-genai>=1.20
+python-dotenv>=1.0

@@ -40,7 +40,7 @@ CT scan ─► Pipeline (TotalSegmentator) ─► 3D anatomy model ─► Planne
    through the patient's volumes in milliseconds and scores it; the planner searches thousands of entries for the
    safest. Everything runs locally: no patient data leaves the device.
 3. **Gemini (FastAPI).** Turns the computed plan into a doctor's procedure plan and a plain-language patient
-   explanation with Q&A and read-aloud. Our code computes every number; Gemini only explains them.
+   explanation with Q&A (and read-aloud when a TTS model is configured). Our code computes every number; Gemini only explains them.
 
 <p align="center">
   <img src="docs/media/segmentation.jpg" alt="Segmented skeleton, lobes, heart, and vessels" width="49%">
@@ -50,9 +50,9 @@ CT scan ─► Pipeline (TotalSegmentator) ─► 3D anatomy model ─► Planne
 ## Run it
 
 ```bash
-# Python (pipeline + API)
+# Python (API + pipeline + uvicorn)
 py -3.12 -m venv .venv
-.venv/Scripts/python -m pip install -r requirements.txt
+.venv/Scripts/python -m pip install -r requirements-dev.txt
 
 # Web
 cd web && npm install && cd ..
@@ -62,8 +62,8 @@ cd web && npm install && cd ..
 .venv/Scripts/python pipeline/segment.py        # TotalSegmentator
 .venv/Scripts/python pipeline/build_case.py     # → web/public/cases/lidc-0742/
 
-# Gemini key (optional; without it the explanations fall back to templates)
-cp .env.example .env                             # then set GEMINI_API_KEY
+# Gemini key (optional; without it the explanations fall back to offline templates)
+cp .env.example .env                             # then set GEMINI_API_KEY (+ GEMINI_MODEL, GEMINI_FALLBACK_MODEL)
 
 # Start
 .venv/Scripts/python -m uvicorn server.app:app --port 8000
@@ -77,6 +77,17 @@ cd web && npm run dev                            # site at :5173, planner at :51
 | Turn the patient | Right-drag, **View** menu, or keys `1`–`4` |
 | Safest path | **Find safest path** |
 | Explanations | **Plan** (doctor) and **For patient** |
+
+Python deps are split: `requirements.txt` is only the API (FastAPI, google-genai, python-dotenv),
+`pipeline/requirements.txt` is the CT pipeline, and `requirements-dev.txt` installs both plus uvicorn.
+
+## Deploy (Vercel)
+
+One Vercel project at the repo root serves both halves on one domain (see `vercel.json`): the Vite build of
+`web/` as static files, and `api/index.py`, which runs the same FastAPI app as a Python function for `/api/*`
+(only `requirements.txt` is installed). Set `GEMINI_API_KEY`, `GEMINI_MODEL` and `GEMINI_FALLBACK_MODEL` in
+the project's environment variables. If Gemini fails, the API retries once, tries the fallback model, then
+answers with an offline template.
 
 ## The risk model
 

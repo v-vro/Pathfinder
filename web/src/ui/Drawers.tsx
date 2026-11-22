@@ -1,31 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlanJSON } from '../engine/plan';
+import { getHealth, post } from './api';
 import { mdToHtml } from './md';
-
-async function post<T>(url: string, body: unknown): Promise<T> {
-  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-  return r.json();
-}
+import { CHAT_BUSY, doctorTemplate, patientTemplate, sourceLabel } from './offline';
 
 const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
 
 export function DoctorDrawer({ plan, onClose }: { plan: PlanJSON; onClose: () => void }) {
   const [md, setMd] = useState<string | null>(null);
   const [src, setSrc] = useState('');
-  const [err, setErr] = useState<string | null>(null);
   const g = plan.geometry;
   useEffect(() => {
     let live = true;
     setMd(null);
-    post<{ markdown: string; source: string; error?: string }>('/api/doctor-plan', { plan })
+    setSrc('');
+    post<{ markdown: string; source: string }>('/api/doctor-plan', { plan })
       .then((r) => {
         if (!live) return;
         setMd(r.markdown);
         setSrc(r.source);
-        if (r.error) setErr(r.error);
       })
-      .catch((e) => live && setErr(String(e)));
+      .catch(() => {
+        if (!live) return;
+        setMd(doctorTemplate(plan));
+        setSrc('template');
+      });
     return () => {
       live = false;
     };
@@ -78,11 +77,10 @@ export function DoctorDrawer({ plan, onClose }: { plan: PlanJSON; onClose: () =>
           </div>
         </div>
         <div className="section-label">
-          Narrative {src && <span className="src">{src === 'template' ? 'template' : src}</span>}
+          Narrative {src && <span className="src">{sourceLabel(src)}</span>}
         </div>
-        {md === null && !err && <div className="skeleton">Writing…</div>}
+        {md === null && <div className="skeleton">Writing…</div>}
         {md && <div className="md" dangerouslySetInnerHTML={{ __html: mdToHtml(md) }} />}
-        {err && <div className="error">{err}</div>}
       </div>
     </div>
   );
@@ -121,6 +119,8 @@ export const LANGUAGES = [
 interface Msg {
   role: 'patient' | 'assistant';
   text: string;
+  /** UI-only notice (e.g. "busy"); not sent back to the model as conversation history. */
+  notice?: boolean;
 }
 
 export function PatientDrawer({ plan, snapshot, onClose }: { plan: PlanJSON; snapshot: () => string; onClose: () => void }) {
@@ -130,21 +130,44 @@ export function PatientDrawer({ plan, snapshot, onClose }: { plan: PlanJSON; sna
   const [busy, setBusy] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [q, setQ] = useState('');
+  const [asking, setAsking] = useState(false);
   const [audioBusy, setAudioBusy] = useState(false);
+  const [ttsOk, setTtsOk] = useState(false);
   const audio = useRef<HTMLAudioElement | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const reqId = useRef(0); // only the latest explain() may write (language can change mid-request)
+
+  useEffect(() => {
+    let live = true;
+    getHealth().then((h) => live && setTtsOk(h.tts));
+    return () => {
+      live = false;
+      audio.current?.pause();
+    };
+  }, []);
 
   const explain = async (language: string) => {
+    const id = ++reqId.current;
     setBusy(true);
     setText(null);
+    setSrc('');
+    let image: string | undefined;
     try {
-      const r = await post<{ text: string; source: string }>('/api/patient-explain', { plan, language, image: snapshot() });
+      image = snapshot();
+    } catch {
+      image = undefined; // the picture is optional
+    }
+    try {
+      const r = await post<{ text: string; source: string }>('/api/patient-explain', { plan, language, image });
+      if (id !== reqId.current) return;
       setText(r.text);
       setSrc(r.source);
-    } catch (e) {
-      setText(`Could not reach the explanation service: ${e}`);
+    } catch {
+      if (id !== reqId.current) return;
+      setText(patientTemplate(plan));
+      setSrc('template');
     } finally {
-      setBusy(false);
+      if (id === reqId.current) setBusy(false);
     }
   };
 
@@ -160,15 +183,18 @@ export function PatientDrawer({ plan, snapshot, onClose }: { plan: PlanJSON; sna
 
   const ask = async () => {
     const question = q.trim();
-    if (!question) return;
+    if (!question || asking) return;
     setQ('');
-    const history = msgs.map((m) => ({ role: m.role, text: m.text }));
+    setAsking(true);
+    const history = msgs.filter((m) => !m.notice).map((m) => ({ role: m.role, text: m.text }));
     setMsgs((m) => [...m, { role: 'patient', text: question }]);
     try {
       const r = await post<{ text: string }>('/api/patient-chat', { plan, language: lang, history, question });
       setMsgs((m) => [...m, { role: 'assistant', text: r.text }]);
-    } catch (e) {
-      setMsgs((m) => [...m, { role: 'assistant', text: `Sorry — the assistant is unavailable (${e}).` }]);
+    } catch {
+      setMsgs((m) => [...m, { role: 'assistant', text: CHAT_BUSY, notice: true }]);
+    } finally {
+      setAsking(false);
     }
   };
 
@@ -181,13 +207,13 @@ export function PatientDrawer({ plan, snapshot, onClose }: { plan: PlanJSON; sna
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, language: lang }),
       });
-      if (!r.ok) throw new Error(await r.text());
+      if (!r.ok) throw new Error('tts failed');
       const url = URL.createObjectURL(await r.blob());
       audio.current?.pause();
       audio.current = new Audio(url);
       await audio.current.play();
-    } catch (e) {
-      alert(`Text-to-speech unavailable: ${e}`);
+    } catch {
+      setTtsOk(false); // read-aloud isn't working: hide the button rather than show an error
     } finally {
       setAudioBusy(false);
     }
@@ -217,19 +243,22 @@ export function PatientDrawer({ plan, snapshot, onClose }: { plan: PlanJSON; sna
               <option key={l}>{l}</option>
             ))}
           </select>
-          <button className="btn ghost" disabled={!text || audioBusy} onClick={listen}>
-            {audioBusy ? 'Preparing…' : 'Listen'}
-          </button>
+          {ttsOk && (
+            <button className="btn ghost" disabled={!text || audioBusy} onClick={listen}>
+              {audioBusy ? 'Preparing…' : 'Listen'}
+            </button>
+          )}
         </div>
         {busy && <div className="skeleton">Writing in {lang}…</div>}
         {text && <div className="patient-text md" dangerouslySetInnerHTML={{ __html: mdToHtml(text) }} />}
-        {src && <div className="src">{src === 'template' ? 'Template (no Gemini key)' : `Gemini ${src}`}</div>}
+        {src && <div className="src">{sourceLabel(src)}</div>}
 
         <div className="section-label">Questions</div>
         <div className="chat">
           {msgs.map((m, i) => (
             <div key={i} className={`bubble ${m.role}`} dangerouslySetInnerHTML={{ __html: mdToHtml(m.text) }} />
           ))}
+          {asking && <div className="bubble assistant skeleton">Thinking…</div>}
           <div ref={bottom} />
         </div>
         <div className="chat-input">
@@ -239,7 +268,7 @@ export function PatientDrawer({ plan, snapshot, onClose }: { plan: PlanJSON; sna
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && ask()}
           />
-          <button className="btn" onClick={ask}>
+          <button className="btn" onClick={ask} disabled={asking}>
             Ask
           </button>
         </div>
