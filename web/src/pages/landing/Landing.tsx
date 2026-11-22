@@ -1,10 +1,11 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState, type MouseEvent, type ReactNode } from "react";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { DitherCanvas, type DitherSceneSetup } from "../../components/DitherCanvas";
 import { Panel } from "../../components/Panel";
 import { Reveal } from "../../components/Reveal";
 import { SectionHeader } from "../../components/SectionHeader";
+import { DEMO_VIDEO } from "../../components/siteConfig";
 import { HeroAnatomy } from "./HeroAnatomy";
 import {
   IconArrowRight,
@@ -21,9 +22,6 @@ import {
 import { needleCardScene } from "./scenes/anatomy";
 import { pathScene, scanScene } from "./scenes/steps";
 import "./landing.css";
-
-/** Set to a video URL (e.g. "/demo.mp4" in public/) when the demo is recorded. */
-const DEMO_VIDEO_URL = "";
 
 export default function Landing() {
   return (
@@ -49,6 +47,16 @@ function Hero() {
   );
   const hideHint = useCallback(() => setHintVisible(false), []);
 
+  // The router link updates the URL; this makes the scroll smooth on every click,
+  // including repeat clicks when the hash is already #demo.
+  const scrollToDemo = useCallback((e: MouseEvent<HTMLAnchorElement>) => {
+    const target = document.getElementById("demo");
+    if (!target) return;
+    if (window.location.hash === "#demo") e.preventDefault();
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  }, []);
+
   return (
     <section className="lp-hero" aria-labelledby="hero-title">
       <HeroAnatomy className="lp-hero__canvas" onFirstInteraction={hideHint} />
@@ -70,7 +78,7 @@ function Hero() {
             <Button href="/planner" variant="primary" iconEnd={<IconArrowRight />}>
               Try the planner
             </Button>
-            <Button to="/#demo" variant="secondary" iconStart={<IconPlay />}>
+            <Button to="/#demo" variant="secondary" iconStart={<IconPlay />} onClick={scrollToDemo}>
               Watch the demo
             </Button>
           </div>
@@ -278,8 +286,6 @@ function Features() {
 /* ---------------- Demo ---------------- */
 
 function Demo() {
-  const [playing, setPlaying] = useState(false);
-  const hasVideo = DEMO_VIDEO_URL !== "";
   return (
     <section id="demo" className="lp-section lp-section--tint" aria-labelledby="demo-title">
       <div className="pf-container">
@@ -293,44 +299,15 @@ function Demo() {
         </Reveal>
         <Reveal delay={100}>
           <Panel padding="none" variant="inset" className="lp-demo">
-            {playing && hasVideo ? (
-              <video
-                className="lp-demo__video"
-                src={DEMO_VIDEO_URL}
-                controls
-                autoPlay
-                playsInline
-              />
-            ) : (
-              <>
-                <HeroAnatomy
-                  view="poster"
-                  riskPreview={false}
-                  pixelSize={4}
-                  className="lp-demo__poster"
-                  label="Demo video poster"
-                />
-                <div className="lp-demo__overlay">
-                  {hasVideo ? (
-                    <button
-                      type="button"
-                      className="lp-demo__play"
-                      onClick={() => setPlaying(true)}
-                    >
-                      <IconPlay />
-                      <span className="pf-visually-hidden">Play demo video</span>
-                    </button>
-                  ) : (
-                    <span className="lp-demo__play lp-demo__play--disabled" aria-hidden="true">
-                      <IconPlay />
-                    </span>
-                  )}
-                  <p className="pf-mono lp-demo__caption">
-                    {hasVideo ? "Watch the demo" : "Demo video coming soon"}
-                  </p>
-                </div>
-              </>
-            )}
+            <iframe
+              className="lp-demo__video"
+              src={DEMO_VIDEO.embedUrl}
+              title="Pathfinder demo video"
+              loading="lazy"
+              allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
           </Panel>
         </Reveal>
       </div>

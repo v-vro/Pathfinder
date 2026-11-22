@@ -14,3 +14,11 @@ export const DEFAULT_NAV_LINKS: NavLink[] = [
 ];
 
 export const TEAM = ["Eric Fu", "Ibrahim Farrukh", "Shourya Walia"];
+
+/** Demo video shown in the landing page's Demo section. */
+export const DEMO_VIDEO = {
+  /** Public YouTube page, for linking out. */
+  watchUrl: "https://www.youtube.com/watch?v=aN22kHUJo7c",
+  /** Privacy-enhanced embed URL used by the on-page player. */
+  embedUrl: "https://www.youtube-nocookie.com/embed/aN22kHUJo7c",
+};
