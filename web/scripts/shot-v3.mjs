@@ -15,7 +15,7 @@ await page.screenshot({ path: `${out}/v3-2-aim.png` });
 await page.click('text=Find safest path');
 await page.waitForTimeout(1800);
 await page.screenshot({ path: `${out}/v3-3-plan.png` });
-for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight');
+for (let i = 0; i < 7; i++) await page.keyboard.press('ArrowRight');
 await page.keyboard.press('ArrowUp');
 await page.waitForTimeout(900);
 await page.screenshot({ path: `${out}/v3-4-head.png` });

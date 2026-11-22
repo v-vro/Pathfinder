@@ -37,8 +37,8 @@ export class Tracker {
   private fx = new OneEuro(1.0, 0.02);
   private fy = new OneEuro(1.0, 0.02);
   private fz = new OneEuro(0.6, 0.01);
-  private hx = new OneEuro(1.5, 0.05);
-  private hy = new OneEuro(1.5, 0.05);
+  private hx = new OneEuro(0.7, 0.02);
+  private hy = new OneEuro(0.7, 0.02);
   private pinchState = false;
   private frame = 0;
 
@@ -74,6 +74,9 @@ export class Tracker {
         baseOptions: { modelAssetPath: '/models/hand_landmarker.task', delegate: 'GPU' },
         runningMode: 'VIDEO',
         numHands: 1,
+        minHandDetectionConfidence: 0.35,
+        minHandPresenceConfidence: 0.35,
+        minTrackingConfidence: 0.35,
       });
     }
     if (!this.running) {
@@ -161,11 +164,15 @@ export class Tracker {
     const size = Math.hypot(lm[0].x - lm[5].x, lm[0].y - lm[5].y); // wrist -> index knuckle
     const pinchD = Math.hypot(tip.x - thumb.x, tip.y - thumb.y) / Math.max(size, 1e-3);
     // hysteresis so the pinch doesn't flicker
-    if (this.pinchState && pinchD > 0.55) this.pinchState = false;
-    else if (!this.pinchState && pinchD < 0.32) this.pinchState = true;
-    const gain = 1.35;
-    const nx = Math.max(-1.2, Math.min(1.2, -(tip.x - 0.5) * 2 * gain));
-    const ny = Math.max(-1.2, Math.min(1.2, -(tip.y - 0.5) * 2 * gain));
+    if (this.pinchState && pinchD > 0.6) this.pinchState = false;
+    else if (!this.pinchState && pinchD < 0.38) this.pinchState = true;
+    // Pointer = midpoint of thumb and index tips: it barely moves when the fingers close or open,
+    // unlike the fingertip alone, so pinching doesn't jerk the aim.
+    const px = (tip.x + thumb.x) / 2;
+    const py = (tip.y + thumb.y) / 2;
+    const gain = 0.95;
+    const nx = Math.max(-1.2, Math.min(1.2, -(px - 0.5) * 2 * gain));
+    const ny = Math.max(-1.2, Math.min(1.2, -(py - 0.5) * 2 * gain));
     this.onHand?.({ nx: this.hx.filter(nx, t), ny: this.hy.filter(ny, t), pinch: this.pinchState, depth: size });
   }
 }

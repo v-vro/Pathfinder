@@ -52,7 +52,9 @@ export function Reconstruction({ data, onDone, onBack }: { data: CaseData; onDon
     viewer.current?.highlight(hl && hl.meshes.length ? hl.meshes[0] : null);
   }, [hl]);
 
-  useEffect(() => viewer.current?.setPlaneVisible(showPlane), [showPlane]);
+  useEffect(() => {
+    viewer.current?.setPlaneVisible(showPlane);
+  }, [showPlane]);
 
   const legendFor = (code: number) => step.legend.find((l) => l.code === code) ?? null;
   const total = STEPS.length;
