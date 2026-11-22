@@ -56,11 +56,11 @@ function Hero() {
       <div className="lp-hero__inner">
         <div className="lp-hero__copy">
           <img
-            src="/logo-on-dark.png"
+            src="/pathfinder-logo-white-transparent.svg"
             alt="Pathfinder"
             className="lp-hero__logo"
-            width={923}
-            height={184}
+            width={698}
+            height={165}
           />
           <h1 id="hero-title" className="lp-hero__title">
             Find the safest path to the spot that&nbsp;matters.

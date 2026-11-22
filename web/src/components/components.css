@@ -339,7 +339,6 @@
 .pf-logo {
   width: auto;
   max-width: none;
-  filter: var(--logo-filter);
 }
 
 .pf-nav__links {

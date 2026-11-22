@@ -1,13 +1,13 @@
 import "./components.css";
 
-/** The Pathfinder wordmark for dark backgrounds (public/logo-on-dark.png, made from public/logo.png). */
+/** The Pathfinder wordmark: white on transparent (public/pathfinder-logo-white-transparent.svg). */
 export function Logo({ height = 26 }: { height?: number }) {
   return (
     <img
-      src="/logo-on-dark.png"
+      src="/pathfinder-logo-white-transparent.svg"
       alt="Pathfinder"
       height={height}
-      width={Math.round(height * 5.016)}
+      width={Math.round((height * 698) / 165)}
       className="pf-logo"
       style={{ height }}
     />

@@ -88,7 +88,7 @@ Black on white (primary button) is 21:1, and black on `#D4D4D4` (hover) is 14.2:
 
 **Dither palette**, read at runtime by `DitherCanvas`: `--dither-bg` `#000000` (must equal `--color-bg` so canvases have no visible edge), `--dither-fg` `#FFFFFF`, `--dither-levels: 2` (1-bit). `--dither-mid` `#404040` is only used by a canvas that opts into `levels={3}`. Risk markers in dithered scenes are drawn with the `--risk-*` tokens.
 
-**Logo:** `--logo-filter: brightness(0) invert(1)` turns the current colour logo pure white. When a proper monochrome export exists, save it as `public/logo-on-dark.png` and set `--logo-filter: none`.
+**Logo:** `public/pathfinder-logo-white-transparent.svg` is already white on transparent, so no filter is applied.
 
 ### Type
 
@@ -188,7 +188,7 @@ The only way to show a risk colour in UI: the colour, an icon and a word togethe
 
 ### NavBar, Footer, Layout, Logo
 
-`Layout` is the shared page shell (NavBar, `<main id="main">`, Footer). It is a router layout route in `src/App.tsx`, so every page inside it gets the shell. It also handles `/#section` hash links and scroll-to-top on navigation. `NavBar` takes `links` and `action`. Nav links and team names live in `src/components/siteConfig.ts`. `Logo` renders `public/logo-on-dark.png` with `--logo-filter` applied (pure white for now).
+`Layout` is the shared page shell (NavBar, `<main id="main">`, Footer). It is a router layout route in `src/App.tsx`, so every page inside it gets the shell. It also handles `/#section` hash links and scroll-to-top on navigation. `NavBar` takes `links` and `action`. Nav links and team names live in `src/components/siteConfig.ts`. `Logo` renders `public/pathfinder-logo-white-transparent.svg`; `height` sets its size. The planner keeps its own `Mark` logo.
 
 ### Reveal
 
